@@ -65,6 +65,8 @@ PROXY_CONTAINER_NAME=${PROXY_CONTAINER_NAME:-"proxy"}
 PROXY_NETWORK=${PROXY_NETWORK:-"proxy"}
 PROXY_CERTS_DIR=${PROXY_CERTS_DIR:-"~/certs"}
 PROXY_IMAGE=${PROXY_IMAGE:-"nginxproxy/nginx-proxy:alpine"}
+PROXY_CERT_FILE=${PROXY_CERT_FILE:-"allword.local.crt"}
+PROXY_KEY_FILE=${PROXY_KEY_FILE:-"allword.local.key"}
 
 # Configuration file path
 CONFIG_FILE="./wordpress-docker.conf"
@@ -183,6 +185,8 @@ PROXY_CONTAINER_NAME="$PROXY_CONTAINER_NAME"
 PROXY_NETWORK="$PROXY_NETWORK"
 PROXY_CERTS_DIR="$PROXY_CERTS_DIR"
 PROXY_IMAGE="$PROXY_IMAGE"
+PROXY_CERT_FILE="$PROXY_CERT_FILE"
+PROXY_KEY_FILE="$PROXY_KEY_FILE"
 EOF
     
     log_success "Configuration saved successfully!"
@@ -401,6 +405,25 @@ create_directories() {
     mkdir -p "${CONFIG_DIR}/nginx" "${CONFIG_DIR}/nginx/includes" "${CONFIG_DIR}/php"
 
     log_success "Directories created!"
+}
+
+# Generate certificates using mkcert
+generate_certs() {
+    log_info "Checking if mkcert is installed..."
+    if ! command -v mkcert &>/dev/null; then
+        log_error "mkcert is not installed. Please install mkcert and try again."
+        return
+    fi
+
+    log_info "Generating certificates using mkcert..."
+    mkdir -p "$PROXY_CERTS_DIR"
+    mkcert -cert-file "$PROXY_CERTS_DIR/$PROXY_CERT_FILE" -key-file "$PROXY_CERTS_DIR/$PROXY_KEY_FILE" "$DOMAIN" "*.$DOMAIN"
+
+    if [[ -f "$PROXY_CERTS_DIR/$PROXY_CERT_FILE" && -f "$PROXY_CERTS_DIR/$PROXY_KEY_FILE" ]]; then
+        log_success "Certificates generated successfully and saved to $PROXY_CERTS_DIR."
+    else
+        log_error "Failed to generate certificates. Please check mkcert installation and permissions."
+    fi
 }
 
 # Generate configuration files
@@ -970,6 +993,7 @@ show_menu() {
         "Check requirements"
         "Manage hosts file"
         "Manage proxy container"
+        "Generate certificates using mkcert"
         "Exit"
     )
 
@@ -1075,6 +1099,9 @@ EOF
             manage_proxy_container
             ;;
         19)
+            generate_certs
+            ;;
+        20)
             log_info "Exiting..."
             exit 0
             ;;

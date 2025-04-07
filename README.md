@@ -69,6 +69,7 @@ A comprehensive Docker-based WordPress development environment with support for:
 - Start, stop, and remove the proxy container
 - Check proxy container status
 - Automatically configure ports and certificates
+- **Generate SSL certificates using mkcert**
 
 ### Hosts File Management
 - Add or remove domains from the `/etc/hosts` file
@@ -167,6 +168,20 @@ The environment can manage your `/etc/hosts` file to add or remove local domains
 1. Select the "Manage hosts file" option from the menu.
 2. Choose to add, remove, or check domains in the hosts file.
 
+## SSL Certificate Generation
+
+The script includes an option to generate SSL certificates using `mkcert`. This ensures secure HTTPS connections for your local development environment.
+
+1. Ensure `mkcert` is installed on your system. If installed via Homebrew, the script will attempt to update it automatically.
+2. Select the "Generate certificates using mkcert" option from the menu:
+   ```bash
+   ./run.sh
+   # Select "Generate certificates using mkcert"
+   ```
+3. The certificates will be saved in the directory specified by the `PROXY_CERTS_DIR` variable (default: `~/certs`).
+
+If you encounter issues, refer to the "Troubleshooting" section for solutions.
+
 ## Production Deployment
 
 For production deployment:
@@ -181,6 +196,46 @@ For production deployment:
 ## Configuration
 
 The script generates a configuration file (`wordpress-docker.conf`) that stores all your settings. You can edit this file directly or use the configuration menus in the script.
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+1. **Docker Containers Not Starting**
+   - Ensure Docker is running on your system.
+   - Check for port conflicts (e.g., ports 80 or 443 in use) and stop any services using these ports.
+   - Run `docker compose logs` to view error messages.
+
+2. **Domain Not Resolving**
+   - Verify the domain is added to your `/etc/hosts` file.
+   - Use the "Manage hosts file" option in the script to add the domain.
+
+3. **Database Connection Errors**
+   - Check the database credentials in the `.env` file.
+   - Ensure the database container is running: `docker ps`.
+
+4. **Xdebug Not Working**
+   - Verify the IDE is configured to listen on port 9003.
+   - Ensure `host.docker.internal` is accessible from the container.
+
+5. **Permission Issues**
+   - Ensure the script is not run as root.
+   - Verify file and directory permissions match your user ID and group ID.
+
+6. **SSL Certificate Issues**
+   - Ensure `mkcert` is installed and configured.
+   - Regenerate certificates using the "Generate certificates using mkcert" option in the script.
+
+7. **Remote Sync Fails**
+   - Verify SSH access to the remote server.
+   - Check the remote path and permissions.
+
+### Getting Help
+
+If you encounter issues not covered here, consider:
+- Reviewing the logs using `docker compose logs`.
+- Checking the official documentation for Docker, WordPress, or related tools.
+- Opening an issue in the project repository.
 
 ## License
 
