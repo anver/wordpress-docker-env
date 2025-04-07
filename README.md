@@ -11,6 +11,8 @@ A comprehensive Docker-based WordPress development environment with support for:
 - Vite for frontend development
 - Remote sync capabilities
 - Database migration tools
+- Proxy container management
+- Hosts file management
 
 ## Requirements
 
@@ -42,6 +44,7 @@ A comprehensive Docker-based WordPress development environment with support for:
 - Configure Docker networks and container names
 - Set WordPress debugging options
 - Advanced configuration for Docker images and directories
+- Save and load configuration files
 
 ### Docker Management
 - Build, start, stop, restart containers
@@ -61,6 +64,15 @@ A comprehensive Docker-based WordPress development environment with support for:
 - Pull/push databases between environments
 - Search and replace operations in database
 - Import/export databases
+
+### Proxy Container Management
+- Start, stop, and remove the proxy container
+- Check proxy container status
+- Automatically configure ports and certificates
+
+### Hosts File Management
+- Add or remove domains from the `/etc/hosts` file
+- Check if a domain exists in the hosts file
 
 ## Directory Structure
 
@@ -117,6 +129,28 @@ The script provides several options to sync data from remote servers:
    - Search and replace domain names or other strings
    - Export/import databases
 
+## Proxy Container Management
+
+The script includes options to manage a proxy container for handling multiple domains and SSL certificates:
+
+1. Start the proxy container:
+   ```bash
+   ./run.sh
+   # Select "Manage proxy container" -> "Run main proxy container"
+   ```
+
+2. Stop and remove the proxy container:
+   ```bash
+   ./run.sh
+   # Select "Manage proxy container" -> "Stop and remove proxy container"
+   ```
+
+3. Check the proxy container status:
+   ```bash
+   ./run.sh
+   # Select "Manage proxy container" -> "Check proxy container status"
+   ```
+
 ## Debugging with Xdebug
 
 Xdebug is configured and ready to use with common IDEs. The configuration includes:
@@ -126,12 +160,19 @@ Xdebug is configured and ready to use with common IDEs. The configuration includ
 - Debug port 9003
 - IDE Key: "VSCODE"
 
+## Local Domain Setup
+
+The environment can manage your `/etc/hosts` file to add or remove local domains:
+
+1. Select the "Manage hosts file" option from the menu.
+2. Choose to add, remove, or check domains in the hosts file.
+
 ## Production Deployment
 
 For production deployment:
 
-1. Configure your environment using the script's advanced settings
-2. Generate the production docker-compose file
+1. Configure your environment using the script's advanced settings.
+2. Generate the production docker-compose file.
 3. Deploy using:
    ```bash
    docker compose -f docker-compose.prod.yaml up -d

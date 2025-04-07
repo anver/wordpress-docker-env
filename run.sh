@@ -60,6 +60,12 @@ REMOTE_DB_NAME=${REMOTE_DB_NAME:-"wp"}
 LOCAL_DOMAIN=${LOCAL_DOMAIN:-"example.local"}
 REMOTE_DOMAIN=${REMOTE_DOMAIN:-"example.com"}
 
+# Proxy container settings
+PROXY_CONTAINER_NAME=${PROXY_CONTAINER_NAME:-"proxy"}
+PROXY_NETWORK=${PROXY_NETWORK:-"proxy"}
+PROXY_CERTS_DIR=${PROXY_CERTS_DIR:-"~/certs"}
+PROXY_IMAGE=${PROXY_IMAGE:-"nginxproxy/nginx-proxy:alpine"}
+
 # Configuration file path
 CONFIG_FILE="./wordpress-docker.conf"
 
@@ -171,6 +177,12 @@ REMOTE_DB_PASSWORD="$REMOTE_DB_PASSWORD"
 REMOTE_DB_NAME="$REMOTE_DB_NAME"
 LOCAL_DOMAIN="$LOCAL_DOMAIN"
 REMOTE_DOMAIN="$REMOTE_DOMAIN"
+
+# Proxy container settings
+PROXY_CONTAINER_NAME="$PROXY_CONTAINER_NAME"
+PROXY_NETWORK="$PROXY_NETWORK"
+PROXY_CERTS_DIR="$PROXY_CERTS_DIR"
+PROXY_IMAGE="$PROXY_IMAGE"
 EOF
     
     log_success "Configuration saved successfully!"
@@ -808,6 +820,134 @@ EOF
     log_success "$config_type configurations generated!"
 }
 
+# Manage hosts file submenu
+manage_hosts_file() {
+    clear
+    local options=(
+        "Add domain to hosts file"
+        "Remove domain from hosts file"
+        "Check if domain exists in hosts file"
+        "Back to main menu"
+    )
+
+    echo -e "${BLUE}==========================================${NC}"
+    echo -e "${BLUE}         Manage Hosts File Menu          ${NC}"
+    echo -e "${BLUE}==========================================${NC}"
+
+    for i in "${!options[@]}"; do
+        printf "%3d) %s\n" $((i + 1)) "${options[i]}"
+    done
+
+    echo -e "${BLUE}==========================================${NC}"
+    read -rp "Enter your choice: " selection
+
+    case $selection in
+    1)
+        if grep -q "$DOMAIN" /etc/hosts; then
+            log_warning "Domain $DOMAIN already exists in the hosts file."
+        else
+            echo "127.0.0.1 $DOMAIN" | sudo tee -a /etc/hosts > /dev/null
+            log_success "Domain $DOMAIN added to hosts file."
+        fi
+        ;;
+    2)
+        if grep -q "$DOMAIN" /etc/hosts; then
+            sudo sed -i "/$DOMAIN/d" /etc/hosts
+            log_success "Domain $DOMAIN removed from hosts file."
+        else
+            log_warning "Domain $DOMAIN not found in the hosts file."
+        fi
+        ;;
+    3)
+        if grep -q "$DOMAIN" /etc/hosts; then
+            log_success "Domain $DOMAIN exists in the hosts file."
+        else
+            log_warning "Domain $DOMAIN does not exist in the hosts file."
+        fi
+        ;;
+    4)
+        return
+        ;;
+    *)
+        log_warning "Invalid option: $selection"
+        manage_hosts_file
+        ;;
+    esac
+}
+
+# Manage proxy container submenu
+manage_proxy_container() {
+    clear
+    local options=(
+        "Run main proxy container"
+        "Stop and remove proxy container"
+        "Check proxy container status"
+        "Back to main menu"
+    )
+
+    echo -e "${BLUE}==========================================${NC}"
+    echo -e "${BLUE}         Manage Proxy Container          ${NC}"
+    echo -e "${BLUE}==========================================${NC}"
+
+    for i in "${!options[@]}"; do
+        printf "%3d) %s\n" $((i + 1)) "${options[i]}"
+    done
+
+    echo -e "${BLUE}==========================================${NC}"
+    read -rp "Enter your choice: " selection
+
+    case $selection in
+    1)
+        # Check if ports 80 and 443 are free
+        if lsof -i:80 -i:443 &>/dev/null; then
+            log_error "Ports 80 and/or 443 are already in use. Please stop any services using these ports and try again."
+            return
+        fi
+
+        # Check if the Docker image exists, pull if not
+        if ! docker image inspect "$PROXY_IMAGE" &>/dev/null; then
+            log_info "Docker image $PROXY_IMAGE not found. Pulling the image..."
+            docker pull "$PROXY_IMAGE"
+            log_success "Docker image $PROXY_IMAGE pulled successfully."
+        fi
+
+        # Run the proxy container
+        log_info "Running the proxy container..."
+        docker run --name "$PROXY_CONTAINER_NAME" --net "$PROXY_NETWORK" -d --restart=unless-stopped \
+            -p 80:80 -p 443:443 \
+            -v /var/run/docker.sock:/tmp/docker.sock:ro \
+            -v "$PROXY_CERTS_DIR:/etc/nginx/certs" \
+            "$PROXY_IMAGE"
+        log_success "Proxy container $PROXY_CONTAINER_NAME is now running."
+        ;;
+    2)
+        # Stop and remove the proxy container
+        if docker ps -a --format '{{.Names}}' | grep -q "^$PROXY_CONTAINER_NAME\$"; then
+            log_info "Stopping and removing the proxy container..."
+            docker stop "$PROXY_CONTAINER_NAME" && docker rm "$PROXY_CONTAINER_NAME"
+            log_success "Proxy container $PROXY_CONTAINER_NAME stopped and removed."
+        else
+            log_warning "Proxy container $PROXY_CONTAINER_NAME is not running."
+        fi
+        ;;
+    3)
+        # Check the status of the proxy container
+        if docker ps --format '{{.Names}}' | grep -q "^$PROXY_CONTAINER_NAME\$"; then
+            log_success "Proxy container $PROXY_CONTAINER_NAME is running."
+        else
+            log_warning "Proxy container $PROXY_CONTAINER_NAME is not running."
+        fi
+        ;;
+    4)
+        return
+        ;;
+    *)
+        log_warning "Invalid option: $selection"
+        manage_proxy_container
+        ;;
+    esac
+}
+
 # Simplified menu handling
 show_menu() {
     clear
@@ -828,6 +968,8 @@ show_menu() {
         "Create docker network"
         "Create required directories"
         "Check requirements"
+        "Manage hosts file"
+        "Manage proxy container"
         "Exit"
     )
 
@@ -927,6 +1069,12 @@ EOF
             check_requirements
             ;;
         17)
+            manage_hosts_file
+            ;;
+        18)
+            manage_proxy_container
+            ;;
+        19)
             log_info "Exiting..."
             exit 0
             ;;
