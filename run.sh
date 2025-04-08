@@ -80,7 +80,7 @@ fi
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
+BLUE='\033[0;36m' # Changed from light blue to cyan for better visibility
 NC='\033[0m' # No Color
 
 # Common utility functions
@@ -977,104 +977,63 @@ manage_proxy_container() {
     esac
 }
 
-# Simplified menu handling
+# Simplified menu handling with checkbox-style interface using whiptail
 show_menu() {
-    clear
     local options=(
-        "Configure project settings"
-        "Configure advanced settings"
-        "Generate .env file"
-        "Generate nginx.conf file"
-        "Generate PHP configs"
-        "Generate development docker-compose.yml file"
-        "Generate production docker-compose.yml file"
-        "Docker operations menu"
-        "WordPress CLI menu"
-        "Remote sync operations menu"
-        "Remote database sync menu"
-        "Generate WP-CLI aliases file"
-        "List all docker networks"
-        "Create docker network"
-        "Create required directories"
-        "Check requirements"
-        "Manage hosts file"
-        "Manage proxy container"
-        "Generate certificates using mkcert"
-        "Exit"
+        "1" "Check requirements" "OFF"
+        "2" "Configure project settings" "OFF"
+        "3" "Configure advanced settings" "OFF"
+        "4" "Create required directories" "OFF"
+        "5" "Manage proxy container" "OFF"
+        "6" "Generate certificates using mkcert" "OFF"
+        "7" "Manage hosts file" "OFF"
+        "8" "Generate .env file" "OFF"
+        "9" "Generate nginx.conf file" "OFF"
+        "10" "Generate PHP configs" "OFF"
+        "11" "Generate development docker-compose.yml file" "OFF"
+        "12" "Generate production docker-compose.yml file" "OFF"
+        "13" "Docker operations menu" "OFF"
+        "14" "WordPress CLI menu" "OFF"
+        "15" "Remote sync operations menu" "OFF"
+        "16" "Remote database sync menu" "OFF"
+        "17" "Generate WP-CLI aliases file" "OFF"
+        "18" "List all docker networks" "OFF"
+        "19" "Create docker network" "OFF"
+        "20" "Exit" "OFF"
     )
 
-    echo -e "${BLUE}==========================================${NC}"
-    echo -e "${BLUE}       WordPress Docker Environment      ${NC}"
-    echo -e "${BLUE}==========================================${NC}"
-    echo "Select one or more options (e.g., '1', '1-3', or '1 3 5')"
+    local choices
+    choices=$(whiptail --title "WordPress Docker Environment" \
+        --checklist "Select one or more options:" 20 70 15 \
+        "${options[@]}" 3>&1 1>&2 2>&3)
 
-    for i in "${!options[@]}"; do
-        printf "%3d) %s\n" $((i + 1)) "${options[i]}"
-    done
+    clear
 
-    echo -e "${BLUE}==========================================${NC}"
-    read -rp "Enter your choice(s): " selection
-
-    if [[ -z "$selection" ]]; then
+    if [[ -z "$choices" ]]; then
         log_warning "No selection made."
         return 1
     fi
 
-    # Process selection
-    local selected=()
-
-    # Parse the selection (handles ranges and individual selections)
-    for choice in $selection; do
-        if [[ "$choice" =~ ^[0-9]+-[0-9]+$ ]]; then
-            # Range selection
-            local start=${choice%-*}
-            local end=${choice#*-}
-            for ((i = start; i <= end; i++)); do
-                selected+=($i)
-            done
-        elif [[ "$choice" =~ ^[0-9]+$ ]]; then
-            # Individual selection
-            selected+=($choice)
-        fi
-    done
-
     # Execute selected options
-    for choice in "${selected[@]}"; do
+    for choice in $(echo $choices | tr -d '"'); do
         case $choice in
-        1)
-            configure_project
-            ;;
-        2)
-            configure_advanced
-            ;;
-        3)
-            generate_configs "env"
-            ;;
-        4)
-            generate_configs "nginx"
-            ;;
-        5)
-            generate_configs "php"
-            ;;
-        6)
-            generate_configs "docker-dev"
-            ;;
-        7)
-            generate_configs "docker-prod"
-            ;;
-        8)
-            docker_menu
-            ;;
-        9)
-            wpcli_menu
-            ;;
-        10)
-            remote_sync_menu
-            ;;
-        11)
-            remote_db_sync_menu
-            ;;
-        12)
+        "1") check_requirements ;;
+        "2") configure_project ;;
+        "3") configure_advanced ;;
+        "4") create_directories ;;
+        "5") manage_proxy_container ;;
+        "6") generate_certs ;;
+        "7") manage_hosts_file ;;
+        "8") generate_configs "env" ;;
+        "9") generate_configs "nginx" ;;
+        "10") generate_configs "php" ;;
+        "11") generate_configs "docker-dev" ;;
+        "12") generate_configs "docker-prod" ;;
+        "13") docker_menu ;;
+        "14") wpcli_menu ;;
+        "15") remote_sync_menu ;;
+        "16") remote_db_sync_menu ;;
+        "17")
             mkdir -p ~/.wp-cli
             cat <<EOF >~/.wp-cli/config.yml
 @$PROJECT_NAME:
@@ -1083,31 +1042,14 @@ show_menu() {
 EOF
             log_success "WP-CLI aliases file generated!"
             ;;
-        13)
+        "18")
             clear
             log_info "Docker Networks:"
             docker network ls
             read -p "Press Enter to continue..." enter_key
             ;;
-        14)
-            createDockerNetwork
-            ;;
-        15)
-            create_directories
-            ;;
-        16)
-            check_requirements
-            ;;
-        17)
-            manage_hosts_file
-            ;;
-        18)
-            manage_proxy_container
-            ;;
-        19)
-            generate_certs
-            ;;
-        20)
+        "19") createDockerNetwork ;;
+        "20")
             log_info "Exiting..."
             exit 0
             ;;
