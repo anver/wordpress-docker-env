@@ -294,73 +294,79 @@ configure_advanced() {
     echo -e "${BLUE}       Advanced Configuration            ${NC}"
     echo -e "${BLUE}==========================================${NC}"
     echo "Current settings:"
-    echo "1. WordPress image: $WP_IMAGE"
-    echo "2. DB image: $DB_IMAGE"
-    echo "3. Nginx image: $NGINX_IMAGE"
-    echo "4. Node image: $NODE_IMAGE"
-    echo "5. Data directory: $DATA_DIR"
-    echo "6. Config directory: $CONFIG_DIR"
-    echo "7. Docker directory: $DOCKER_DIR"
-    echo "8. WordPress table prefix: $WP_TABLE_PREFIX"
-    echo "9. WordPress debug: $WP_DEBUG"
-    echo "10. Production Docker network: $DOCKER_PROD_NETWORK"
-    echo "11. Save configuration and return"
+    echo "1. WordPress production image: $WP_IMAGE"
+    echo "2. WordPress dev image: $WP_UNIT_TESTING_IMAGE"
+    echo "3. DB image: $DB_IMAGE"
+    echo "4. Nginx image: $NGINX_IMAGE"
+    echo "5. Node image: $NODE_IMAGE"
+    echo "6. Data directory: $DATA_DIR"
+    echo "7. Config directory: $CONFIG_DIR"
+    echo "8. Docker directory: $DOCKER_DIR"
+    echo "9. WordPress table prefix: $WP_TABLE_PREFIX"
+    echo "10. WordPress debug: $WP_DEBUG"
+    echo "11. Production Docker network: $DOCKER_PROD_NETWORK"
+    echo "12. Save configuration and return"
     echo -e "${BLUE}==========================================${NC}"
     
     read -rp "Enter your choice: " choice
     
     case $choice in
     1)
-        read -rp "WordPress image [$WP_IMAGE]: " new_wp_image
+        read -rp "WordPress production image [$WP_IMAGE]: " new_wp_image
         WP_IMAGE=${new_wp_image:-$WP_IMAGE}
         configure_advanced
         ;;
     2)
+        read -rp "WordPress dev image [$WP_UNIT_TESTING_IMAGE]: " new_wp_unit_testing_image
+        WP_UNIT_TESTING_IMAGE=${new_wp_unit_testing_image:-$WP_UNIT_TESTING_IMAGE}
+        configure_advanced
+        ;;
+    3)
         read -rp "DB image [$DB_IMAGE]: " new_db_image
         DB_IMAGE=${new_db_image:-$DB_IMAGE}
         configure_advanced
         ;;
-    3)
+    4)
         read -rp "Nginx image [$NGINX_IMAGE]: " new_nginx_image
         NGINX_IMAGE=${new_nginx_image:-$NGINX_IMAGE}
         configure_advanced
         ;;
-    4)
+    5)
         read -rp "Node image [$NODE_IMAGE]: " new_node_image
         NODE_IMAGE=${new_node_image:-$NODE_IMAGE}
         configure_advanced
         ;;
-    5)
+    6)
         read -rp "Data directory [$DATA_DIR]: " new_data_dir
         DATA_DIR=${new_data_dir:-$DATA_DIR}
         configure_advanced
         ;;
-    6)
+    7)
         read -rp "Config directory [$CONFIG_DIR]: " new_config_dir
         CONFIG_DIR=${new_config_dir:-$CONFIG_DIR}
         configure_advanced
         ;;
-    7)
+    8)
         read -rp "Docker directory [$DOCKER_DIR]: " new_docker_dir
         DOCKER_DIR=${new_docker_dir:-$DOCKER_DIR}
         configure_advanced
         ;;
-    8)
+    9)
         read -rp "WordPress table prefix [$WP_TABLE_PREFIX]: " new_wp_table_prefix
         WP_TABLE_PREFIX=${new_wp_table_prefix:-$WP_TABLE_PREFIX}
         configure_advanced
         ;;
-    9)
+    10)
         read -rp "WordPress debug (true/false) [$WP_DEBUG]: " new_wp_debug
         WP_DEBUG=${new_wp_debug:-$WP_DEBUG}
         configure_advanced
         ;;
-    10)
+    11)
         read -rp "Production Docker network [$DOCKER_PROD_NETWORK]: " new_docker_prod_network
         DOCKER_PROD_NETWORK=${new_docker_prod_network:-$DOCKER_PROD_NETWORK}
         configure_advanced
         ;;
-    11)
+    12)
         save_config
         return
         ;;
