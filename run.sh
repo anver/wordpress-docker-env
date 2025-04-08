@@ -194,97 +194,129 @@ EOF
 
 # Configure project settings menu
 configure_project() {
-    clear
-    echo -e "${BLUE}==========================================${NC}"
-    echo -e "${BLUE}         Project Configuration           ${NC}"
-    echo -e "${BLUE}==========================================${NC}"
-    echo "Current settings:"
-    echo "1. Project name: $PROJECT_NAME"
-    echo "2. Domain: $DOMAIN"
-    echo "3. Vite dev server: $VITE_DEV_SERVER"
-    echo "4. MySQL database: $MYSQL_DATABASE"
-    echo "5. MySQL user: $MYSQL_USER"
-    echo "6. MySQL password: $MYSQL_PASSWORD"
-    echo "7. MySQL root password: $MYSQL_ROOT_PASSWORD"
-    echo "8. Docker dev network: $DOCKER_DEV_NETWORK"
-    echo "9. Save configuration and return"
-    echo -e "${BLUE}==========================================${NC}"
-    
-    read -rp "Enter your choice: " choice
-    
-    case $choice in
-    1)
-        read -rp "Project name [$PROJECT_NAME]: " new_project_name
-        PROJECT_NAME=${new_project_name:-$PROJECT_NAME}
-        # Update container names based on project name if they are default
-        if [[ "$WP_CONTAINER" == "wordpress" ]]; then
-            WP_CONTAINER="${PROJECT_NAME}_wp"
+    local options=(
+        "1" "Project name: $PROJECT_NAME"
+        "2" "Domain: $DOMAIN"
+        "3" "Vite dev server: $VITE_DEV_SERVER"
+        "4" "MySQL database: $MYSQL_DATABASE"
+        "5" "MySQL user: $MYSQL_USER"
+        "6" "MySQL password: $MYSQL_PASSWORD"
+        "7" "MySQL root password: $MYSQL_ROOT_PASSWORD"
+        "8" "Docker dev network: $DOCKER_DEV_NETWORK"
+        "9" "Save configuration and return"
+    )
+
+    while true; do
+        local choice
+        choice=$(whiptail --title "Project Configuration" \
+            --nocancel \
+            --menu "Select setting to modify:" 20 70 9 \
+            "${options[@]}" \
+            3>&1 1>&2 2>&3)
+
+        # Exit the loop if user pressed Escape or selected nothing
+        if [[ -z "$choice" ]]; then
+            return 0
         fi
-        if [[ "$DB_CONTAINER" == "db" ]]; then
-            DB_CONTAINER="${PROJECT_NAME}_db"
-        fi
-        if [[ "$WP_CLI_CONTAINER" == "wp-cli" ]]; then
-            WP_CLI_CONTAINER="${PROJECT_NAME}_wpcli"
-        fi
-        if [[ "$REDIS_CONTAINER" == "redis" ]]; then
-            REDIS_CONTAINER="${PROJECT_NAME}_redis"
-        fi
-        if [[ "$NGINX_CONTAINER" == "nginx" ]]; then
-            NGINX_CONTAINER="${PROJECT_NAME}_nginx"
-        fi
-        if [[ "$VITE_CONTAINER" == "vite" ]]; then
-            VITE_CONTAINER="${PROJECT_NAME}_vite"
-        fi
-        configure_project
-        ;;
-    2)
-        read -rp "Domain [$DOMAIN]: " new_domain
-        DOMAIN=${new_domain:-$DOMAIN}
-        # Update local domain if it matches the default
-        if [[ "$LOCAL_DOMAIN" == "example.local" ]]; then
-            LOCAL_DOMAIN="$DOMAIN"
-        fi
-        configure_project
-        ;;
-    3)
-        read -rp "Vite dev server [$VITE_DEV_SERVER]: " new_vite_dev_server
-        VITE_DEV_SERVER=${new_vite_dev_server:-$VITE_DEV_SERVER}
-        configure_project
-        ;;
-    4)
-        read -rp "MySQL database [$MYSQL_DATABASE]: " new_mysql_database
-        MYSQL_DATABASE=${new_mysql_database:-$MYSQL_DATABASE}
-        configure_project
-        ;;
-    5)
-        read -rp "MySQL user [$MYSQL_USER]: " new_mysql_user
-        MYSQL_USER=${new_mysql_user:-$MYSQL_USER}
-        configure_project
-        ;;
-    6)
-        read -rp "MySQL password [$MYSQL_PASSWORD]: " new_mysql_password
-        MYSQL_PASSWORD=${new_mysql_password:-$MYSQL_PASSWORD}
-        configure_project
-        ;;
-    7)
-        read -rp "MySQL root password [$MYSQL_ROOT_PASSWORD]: " new_mysql_root_password
-        MYSQL_ROOT_PASSWORD=${new_mysql_root_password:-$MYSQL_ROOT_PASSWORD}
-        configure_project
-        ;;
-    8)
-        read -rp "Docker dev network [$DOCKER_DEV_NETWORK]: " new_docker_dev_network
-        DOCKER_DEV_NETWORK=${new_docker_dev_network:-$DOCKER_DEV_NETWORK}
-        configure_project
-        ;;
-    9)
-        save_config
-        return
-        ;;
-    *)
-        log_warning "Invalid choice: $choice"
-        configure_project
-        ;;
-    esac
+
+        case $choice in
+        "1")
+            local new_project_name
+            new_project_name=$(whiptail --title "Project Name" --nocancel --inputbox "Enter project name:" 10 60 "$PROJECT_NAME" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_project_name" ]]; then
+                PROJECT_NAME="$new_project_name"
+                # Update container names based on project name if they are default
+                if [[ "$WP_CONTAINER" == "wordpress" ]]; then
+                    WP_CONTAINER="${PROJECT_NAME}_wp"
+                fi
+                if [[ "$DB_CONTAINER" == "db" ]]; then
+                    DB_CONTAINER="${PROJECT_NAME}_db"
+                fi
+                if [[ "$WP_CLI_CONTAINER" == "wp-cli" ]]; then
+                    WP_CLI_CONTAINER="${PROJECT_NAME}_wpcli"
+                fi
+                if [[ "$REDIS_CONTAINER" == "redis" ]]; then
+                    REDIS_CONTAINER="${PROJECT_NAME}_redis"
+                fi
+                if [[ "$NGINX_CONTAINER" == "nginx" ]]; then
+                    NGINX_CONTAINER="${PROJECT_NAME}_nginx"
+                fi
+                if [[ "$VITE_CONTAINER" == "vite" ]]; then
+                    VITE_CONTAINER="${PROJECT_NAME}_vite"
+                fi
+                options[1]="Project name: $PROJECT_NAME"
+            fi
+            ;;
+        "2")
+            local new_domain
+            new_domain=$(whiptail --title "Domain" --nocancel --inputbox "Enter domain:" 10 60 "$DOMAIN" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_domain" ]]; then
+                DOMAIN="$new_domain"
+                # Update local domain if it matches the default
+                if [[ "$LOCAL_DOMAIN" == "example.local" ]]; then
+                    LOCAL_DOMAIN="$DOMAIN"
+                fi
+                options[3]="Domain: $DOMAIN"
+            fi
+            ;;
+        "3")
+            local new_vite_dev_server
+            new_vite_dev_server=$(whiptail --title "Vite Dev Server" --nocancel --inputbox "Enter Vite dev server domain:" 10 60 "$VITE_DEV_SERVER" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_vite_dev_server" ]]; then
+                VITE_DEV_SERVER="$new_vite_dev_server"
+                options[5]="Vite dev server: $VITE_DEV_SERVER"
+            fi
+            ;;
+        "4")
+            local new_mysql_database
+            new_mysql_database=$(whiptail --title "MySQL Database" --nocancel --inputbox "Enter MySQL database name:" 10 60 "$MYSQL_DATABASE" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_mysql_database" ]]; then
+                MYSQL_DATABASE="$new_mysql_database"
+                options[7]="MySQL database: $MYSQL_DATABASE"
+            fi
+            ;;
+        "5")
+            local new_mysql_user
+            new_mysql_user=$(whiptail --title "MySQL User" --nocancel --inputbox "Enter MySQL user:" 10 60 "$MYSQL_USER" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_mysql_user" ]]; then
+                MYSQL_USER="$new_mysql_user"
+                options[9]="MySQL user: $MYSQL_USER"
+            fi
+            ;;
+        "6")
+            local new_mysql_password
+            new_mysql_password=$(whiptail --title "MySQL Password" --nocancel --passwordbox "Enter MySQL password:" 10 60 "$MYSQL_PASSWORD" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_mysql_password" ]]; then
+                MYSQL_PASSWORD="$new_mysql_password"
+                options[11]="MySQL password: $MYSQL_PASSWORD"
+            fi
+            ;;
+        "7")
+            local new_mysql_root_password
+            new_mysql_root_password=$(whiptail --title "MySQL Root Password" --nocancel --passwordbox "Enter MySQL root password:" 10 60 "$MYSQL_ROOT_PASSWORD" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_mysql_root_password" ]]; then
+                MYSQL_ROOT_PASSWORD="$new_mysql_root_password"
+                options[13]="MySQL root password: $MYSQL_ROOT_PASSWORD"
+            fi
+            ;;
+        "8")
+            local new_docker_dev_network
+            new_docker_dev_network=$(whiptail --title "Docker Dev Network" --nocancel --inputbox "Enter Docker dev network name:" 10 60 "$DOCKER_DEV_NETWORK" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_docker_dev_network" ]]; then
+                DOCKER_DEV_NETWORK="$new_docker_dev_network"
+                options[15]="Docker dev network: $DOCKER_DEV_NETWORK"
+            fi
+            ;;
+        "9")
+            save_config
+            log_success "Configuration saved!"
+            return 0
+            ;;
+        *)
+            log_warning "Invalid choice: $choice"
+            ;;
+        esac
+    done
 }
 
 # Configure advanced settings menu
@@ -1004,6 +1036,7 @@ show_menu() {
 
     local choices
     choices=$(whiptail --title "WordPress Docker Environment" \
+        --nocancel \
         --checklist "Select one or more options:" 20 70 15 \
         "${options[@]}" 3>&1 1>&2 2>&3)
 
