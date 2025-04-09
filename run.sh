@@ -321,92 +321,651 @@ configure_project() {
 
 # Configure advanced settings menu
 configure_advanced() {
-    clear
-    echo -e "${BLUE}==========================================${NC}"
-    echo -e "${BLUE}       Advanced Configuration            ${NC}"
-    echo -e "${BLUE}==========================================${NC}"
-    echo "Current settings:"
-    echo "1. WordPress production image: $WP_IMAGE"
-    echo "2. WordPress dev image: $WP_UNIT_TESTING_IMAGE"
-    echo "3. DB image: $DB_IMAGE"
-    echo "4. Nginx image: $NGINX_IMAGE"
-    echo "5. Node image: $NODE_IMAGE"
-    echo "6. Data directory: $DATA_DIR"
-    echo "7. Config directory: $CONFIG_DIR"
-    echo "8. Docker directory: $DOCKER_DIR"
-    echo "9. WordPress table prefix: $WP_TABLE_PREFIX"
-    echo "10. WordPress debug: $WP_DEBUG"
-    echo "11. Production Docker network: $DOCKER_PROD_NETWORK"
-    echo "12. Save configuration and return"
-    echo -e "${BLUE}==========================================${NC}"
-    
-    read -rp "Enter your choice: " choice
-    
-    case $choice in
-    1)
-        read -rp "WordPress production image [$WP_IMAGE]: " new_wp_image
-        WP_IMAGE=${new_wp_image:-$WP_IMAGE}
-        configure_advanced
-        ;;
-    2)
-        read -rp "WordPress dev image [$WP_UNIT_TESTING_IMAGE]: " new_wp_unit_testing_image
-        WP_UNIT_TESTING_IMAGE=${new_wp_unit_testing_image:-$WP_UNIT_TESTING_IMAGE}
-        configure_advanced
-        ;;
-    3)
-        read -rp "DB image [$DB_IMAGE]: " new_db_image
-        DB_IMAGE=${new_db_image:-$DB_IMAGE}
-        configure_advanced
-        ;;
-    4)
-        read -rp "Nginx image [$NGINX_IMAGE]: " new_nginx_image
-        NGINX_IMAGE=${new_nginx_image:-$NGINX_IMAGE}
-        configure_advanced
-        ;;
-    5)
-        read -rp "Node image [$NODE_IMAGE]: " new_node_image
-        NODE_IMAGE=${new_node_image:-$NODE_IMAGE}
-        configure_advanced
-        ;;
-    6)
-        read -rp "Data directory [$DATA_DIR]: " new_data_dir
-        DATA_DIR=${new_data_dir:-$DATA_DIR}
-        configure_advanced
-        ;;
-    7)
-        read -rp "Config directory [$CONFIG_DIR]: " new_config_dir
-        CONFIG_DIR=${new_config_dir:-$CONFIG_DIR}
-        configure_advanced
-        ;;
-    8)
-        read -rp "Docker directory [$DOCKER_DIR]: " new_docker_dir
-        DOCKER_DIR=${new_docker_dir:-$DOCKER_DIR}
-        configure_advanced
-        ;;
-    9)
-        read -rp "WordPress table prefix [$WP_TABLE_PREFIX]: " new_wp_table_prefix
-        WP_TABLE_PREFIX=${new_wp_table_prefix:-$WP_TABLE_PREFIX}
-        configure_advanced
-        ;;
-    10)
-        read -rp "WordPress debug (true/false) [$WP_DEBUG]: " new_wp_debug
-        WP_DEBUG=${new_wp_debug:-$WP_DEBUG}
-        configure_advanced
-        ;;
-    11)
-        read -rp "Production Docker network [$DOCKER_PROD_NETWORK]: " new_docker_prod_network
-        DOCKER_PROD_NETWORK=${new_docker_prod_network:-$DOCKER_PROD_NETWORK}
-        configure_advanced
-        ;;
-    12)
-        save_config
-        return
-        ;;
-    *)
-        log_warning "Invalid choice: $choice"
-        configure_advanced
-        ;;
-    esac
+    local options=(
+        "1" "WordPress production image: $WP_IMAGE"
+        "2" "WordPress dev image: $WP_UNIT_TESTING_IMAGE"
+        "3" "DB image: $DB_IMAGE"
+        "4" "Nginx image: $NGINX_IMAGE"
+        "5" "Node image: $NODE_IMAGE"
+        "6" "Data directory: $DATA_DIR"
+        "7" "Config directory: $CONFIG_DIR"
+        "8" "Docker directory: $DOCKER_DIR"
+        "9" "WordPress table prefix: $WP_TABLE_PREFIX"
+        "10" "WordPress debug: $WP_DEBUG"
+        "11" "Production Docker network: $DOCKER_PROD_NETWORK"
+        "12" "Save configuration and return"
+    )
+
+    while true; do
+        local choice
+        choice=$(whiptail --title "Advanced Configuration" \
+            --nocancel \
+            --menu "Select setting to modify:" 20 76 12 \
+            "${options[@]}" \
+            3>&1 1>&2 2>&3)
+
+        # Exit the loop if user pressed Escape or selected nothing
+        if [[ -z "$choice" ]]; then
+            return 0
+        fi
+
+        case $choice in
+        "1")
+            local new_wp_image
+            new_wp_image=$(whiptail --title "WordPress Production Image" --nocancel --inputbox "Enter WordPress production image:" 10 60 "$WP_IMAGE" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_wp_image" ]]; then
+                WP_IMAGE="$new_wp_image"
+                options[1]="WordPress production image: $WP_IMAGE"
+            fi
+            ;;
+        "2")
+            local new_wp_unit_testing_image
+            new_wp_unit_testing_image=$(whiptail --title "WordPress Dev Image" --nocancel --inputbox "Enter WordPress dev image:" 10 60 "$WP_UNIT_TESTING_IMAGE" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_wp_unit_testing_image" ]]; then
+                WP_UNIT_TESTING_IMAGE="$new_wp_unit_testing_image"
+                options[3]="WordPress dev image: $WP_UNIT_TESTING_IMAGE"
+            fi
+            ;;
+        "3")
+            local new_db_image
+            new_db_image=$(whiptail --title "DB Image" --nocancel --inputbox "Enter DB image:" 10 60 "$DB_IMAGE" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_db_image" ]]; then
+                DB_IMAGE="$new_db_image"
+                options[5]="DB image: $DB_IMAGE"
+            fi
+            ;;
+        "4")
+            local new_nginx_image
+            new_nginx_image=$(whiptail --title "Nginx Image" --nocancel --inputbox "Enter Nginx image:" 10 60 "$NGINX_IMAGE" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_nginx_image" ]]; then
+                NGINX_IMAGE="$new_nginx_image"
+                options[7]="Nginx image: $NGINX_IMAGE"
+            fi
+            ;;
+        "5")
+            local new_node_image
+            new_node_image=$(whiptail --title "Node Image" --nocancel --inputbox "Enter Node image:" 10 60 "$NODE_IMAGE" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_node_image" ]]; then
+                NODE_IMAGE="$new_node_image"
+                options[9]="Node image: $NODE_IMAGE"
+            fi
+            ;;
+        "6")
+            local new_data_dir
+            new_data_dir=$(whiptail --title "Data Directory" --nocancel --inputbox "Enter data directory path:" 10 60 "$DATA_DIR" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_data_dir" ]]; then
+                DATA_DIR="$new_data_dir"
+                options[11]="Data directory: $DATA_DIR"
+            fi
+            ;;
+        "7")
+            local new_config_dir
+            new_config_dir=$(whiptail --title "Config Directory" --nocancel --inputbox "Enter config directory path:" 10 60 "$CONFIG_DIR" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_config_dir" ]]; then
+                CONFIG_DIR="$new_config_dir"
+                options[13]="Config directory: $CONFIG_DIR"
+            fi
+            ;;
+        "8")
+            local new_docker_dir
+            new_docker_dir=$(whiptail --title "Docker Directory" --nocancel --inputbox "Enter docker directory path:" 10 60 "$DOCKER_DIR" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_docker_dir" ]]; then
+                DOCKER_DIR="$new_docker_dir"
+                options[15]="Docker directory: $DOCKER_DIR"
+            fi
+            ;;
+        "9")
+            local new_wp_table_prefix
+            new_wp_table_prefix=$(whiptail --title "WordPress Table Prefix" --nocancel --inputbox "Enter WordPress table prefix:" 10 60 "$WP_TABLE_PREFIX" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_wp_table_prefix" ]]; then
+                WP_TABLE_PREFIX="$new_wp_table_prefix"
+                options[17]="WordPress table prefix: $WP_TABLE_PREFIX"
+            fi
+            ;;
+        "10")
+            local new_wp_debug
+            new_wp_debug=$(whiptail --title "WordPress Debug" --nocancel --inputbox "Enter WordPress debug (true/false):" 10 60 "$WP_DEBUG" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_wp_debug" ]]; then
+                WP_DEBUG="$new_wp_debug"
+                options[19]="WordPress debug: $WP_DEBUG"
+            fi
+            ;;
+        "11")
+            local new_docker_prod_network
+            new_docker_prod_network=$(whiptail --title "Production Docker Network" --nocancel --inputbox "Enter production Docker network:" 10 60 "$DOCKER_PROD_NETWORK" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_docker_prod_network" ]]; then
+                DOCKER_PROD_NETWORK="$new_docker_prod_network"
+                options[21]="Production Docker network: $DOCKER_PROD_NETWORK"
+            fi
+            ;;
+        "12")
+            save_config
+            log_success "Configuration saved!"
+            return 0
+            ;;
+        *)
+            log_warning "Invalid choice: $choice"
+            ;;
+        esac
+    done
+}
+
+# Manage hosts file submenu
+manage_hosts_file() {
+    local options=(
+        "1" "Add domain to hosts file"
+        "2" "Remove domain from hosts file"
+        "3" "Check if domain exists in hosts file"
+        "4" "Back to main menu"
+    )
+
+    while true; do
+        local choice
+        choice=$(whiptail --title "Manage Hosts File Menu" \
+            --nocancel \
+            --menu "Select an option:" 15 60 4 \
+            "${options[@]}" \
+            3>&1 1>&2 2>&3)
+
+        # Exit the loop if user pressed Escape or selected nothing
+        if [[ -z "$choice" || "$choice" == "4" ]]; then
+            return 0
+        fi
+
+        case $choice in
+        "1")
+            if grep -q "$DOMAIN" /etc/hosts; then
+                whiptail --title "Warning" --msgbox "Domain $DOMAIN already exists in the hosts file." 10 60
+            else
+                echo "127.0.0.1 $DOMAIN" | sudo tee -a /etc/hosts > /dev/null
+                whiptail --title "Success" --msgbox "Domain $DOMAIN added to hosts file." 10 60
+            fi
+            ;;
+        "2")
+            if grep -q "$DOMAIN" /etc/hosts; then
+                sudo sed -i "/$DOMAIN/d" /etc/hosts
+                whiptail --title "Success" --msgbox "Domain $DOMAIN removed from hosts file." 10 60
+            else
+                whiptail --title "Warning" --msgbox "Domain $DOMAIN not found in the hosts file." 10 60
+            fi
+            ;;
+        "3")
+            if grep -q "$DOMAIN" /etc/hosts; then
+                whiptail --title "Status" --msgbox "Domain $DOMAIN exists in the hosts file." 10 60
+            else
+                whiptail --title "Status" --msgbox "Domain $DOMAIN does not exist in the hosts file." 10 60
+            fi
+            ;;
+        *)
+            log_warning "Invalid choice: $choice"
+            ;;
+        esac
+    done
+}
+
+# Manage proxy container submenu
+manage_proxy_container() {
+    local options=(
+        "1" "Run main proxy container"
+        "2" "Stop and remove proxy container"
+        "3" "Check proxy container status"
+        "4" "Back to main menu"
+    )
+
+    while true; do
+        local choice
+        choice=$(whiptail --title "Manage Proxy Container" \
+            --nocancel \
+            --menu "Select an option:" 15 60 4 \
+            "${options[@]}" \
+            3>&1 1>&2 2>&3)
+
+        # Exit the loop if user pressed Escape or selected nothing
+        if [[ -z "$choice" || "$choice" == "4" ]]; then
+            return 0
+        fi
+
+        case $choice in
+        "1")
+            # Check if ports 80 and 443 are free
+            if lsof -i:80 -i:443 &>/dev/null; then
+                whiptail --title "Error" --msgbox "Ports 80 and/or 443 are already in use. Please stop any services using these ports and try again." 10 70
+                continue
+            fi
+
+            # Check if the Docker image exists, pull if not
+            if ! docker image inspect "$PROXY_IMAGE" &>/dev/null; then
+                log_info "Docker image $PROXY_IMAGE not found. Pulling the image..."
+                docker pull "$PROXY_IMAGE"
+                log_success "Docker image $PROXY_IMAGE pulled successfully."
+            fi
+
+            # Check if container already exists
+            if docker ps --format '{{.Names}}' | grep -q "^$PROXY_CONTAINER_NAME\$"; then
+                whiptail --title "Information" --msgbox "Proxy container $PROXY_CONTAINER_NAME is already running." 10 60
+                continue
+            elif docker ps -a --format '{{.Names}}' | grep -q "^$PROXY_CONTAINER_NAME\$"; then
+                log_info "Container exists but is not running. Starting container..."
+                docker start "$PROXY_CONTAINER_NAME"
+                whiptail --title "Success" --msgbox "Proxy container $PROXY_CONTAINER_NAME started." 10 60
+                continue
+            fi
+
+            # Run the proxy container
+            log_info "Running the proxy container..."
+            docker run --name "$PROXY_CONTAINER_NAME" --net "$PROXY_NETWORK" -d --restart=unless-stopped \
+                -p 80:80 -p 443:443 \
+                -v /var/run/docker.sock:/tmp/docker.sock:ro \
+                -v "$PROXY_CERTS_DIR:/etc/nginx/certs" \
+                "$PROXY_IMAGE"
+            
+            whiptail --title "Success" --msgbox "Proxy container $PROXY_CONTAINER_NAME is now running." 10 60
+            ;;
+        "2")
+            # Stop and remove the proxy container
+            if docker ps -a --format '{{.Names}}' | grep -q "^$PROXY_CONTAINER_NAME\$"; then
+                log_info "Stopping and removing the proxy container..."
+                docker stop "$PROXY_CONTAINER_NAME" && docker rm "$PROXY_CONTAINER_NAME"
+                whiptail --title "Success" --msgbox "Proxy container $PROXY_CONTAINER_NAME stopped and removed." 10 70
+            else
+                whiptail --title "Warning" --msgbox "Proxy container $PROXY_CONTAINER_NAME is not running." 10 60
+            fi
+            ;;
+        "3")
+            # Check the status of the proxy container
+            if docker ps --format '{{.Names}}' | grep -q "^$PROXY_CONTAINER_NAME\$"; then
+                whiptail --title "Status" --msgbox "Proxy container $PROXY_CONTAINER_NAME is running." 10 60
+            else
+                whiptail --title "Status" --msgbox "Proxy container $PROXY_CONTAINER_NAME is not running." 10 60
+            fi
+            ;;
+        *)
+            log_warning "Invalid choice: $choice"
+            ;;
+        esac
+    done
+}
+
+# Docker management submenu
+docker_menu() {
+    local options=(
+        "1" "Build and start containers"
+        "2" "Stop containers"
+        "3" "Start containers"
+        "4" "Restart containers"
+        "5" "Remove containers"
+        "6" "View logs"
+        "7" "Access container shell"
+        "8" "Back to main menu"
+    )
+
+    while true; do
+        local choice
+        choice=$(whiptail --title "Docker Management Menu" \
+            --nocancel \
+            --menu "Select an operation:" 17 60 8 \
+            "${options[@]}" \
+            3>&1 1>&2 2>&3)
+
+        # Exit the loop if user pressed Escape or selected nothing
+        if [[ -z "$choice" || "$choice" == "8" ]]; then
+            return 0
+        fi
+
+        case $choice in
+        "1")
+            log_info "Building and starting containers..."
+            docker compose up -d --build
+            whiptail --title "Success" --msgbox "Containers built and started!" 10 60
+            ;;
+        "2")
+            log_info "Stopping containers..."
+            docker compose stop
+            whiptail --title "Success" --msgbox "Containers stopped!" 10 60
+            ;;
+        "3")
+            log_info "Starting containers..."
+            docker compose start
+            whiptail --title "Success" --msgbox "Containers started!" 10 60
+            ;;
+        "4")
+            log_info "Restarting containers..."
+            docker compose restart
+            whiptail --title "Success" --msgbox "Containers restarted!" 10 60
+            ;;
+        "5")
+            log_info "Removing containers..."
+            docker compose down
+            whiptail --title "Success" --msgbox "Containers removed!" 10 60
+            ;;
+        "6")
+            local container
+            container=$(whiptail --title "View Logs" \
+                --nocancel \
+                --menu "Select container:" 15 60 5 \
+                "wp" "WordPress container" \
+                "db" "Database container" \
+                "nginx" "Nginx container" \
+                "redis" "Redis container" \
+                "vite" "Vite container" \
+                3>&1 1>&2 2>&3)
+                
+            if [[ -n "$container" ]]; then
+                clear
+                log_info "Viewing logs for $container container. Press Ctrl+C to exit."
+                sleep 2
+                case "$container" in
+                "wp")
+                    docker logs -f ${WP_CONTAINER}
+                    ;;
+                "db")
+                    docker logs -f ${DB_CONTAINER}
+                    ;;
+                "nginx")
+                    docker logs -f ${NGINX_CONTAINER}
+                    ;;
+                "redis")
+                    docker logs -f ${REDIS_CONTAINER}
+                    ;;
+                "vite")
+                    docker logs -f ${VITE_CONTAINER}
+                    ;;
+                esac
+                read -p "Press Enter to continue..." enter_key
+            fi
+            ;;
+        "7")
+            local container
+            container=$(whiptail --title "Access Container Shell" \
+                --nocancel \
+                --menu "Select container:" 16 60 6 \
+                "wp" "WordPress container" \
+                "db" "Database container" \
+                "nginx" "Nginx container" \
+                "redis" "Redis container" \
+                "vite" "Vite container" \
+                "wpcli" "WP-CLI container" \
+                3>&1 1>&2 2>&3)
+                
+            if [[ -n "$container" ]]; then
+                clear
+                log_info "Accessing shell for $container container. Type 'exit' to return."
+                sleep 2
+                case "$container" in
+                "wp")
+                    docker exec -it ${WP_CONTAINER} /bin/bash
+                    ;;
+                "db")
+                    docker exec -it ${DB_CONTAINER} /bin/bash
+                    ;;
+                "nginx")
+                    docker exec -it ${NGINX_CONTAINER} /bin/sh
+                    ;;
+                "redis")
+                    docker exec -it ${REDIS_CONTAINER} /bin/sh
+                    ;;
+                "vite")
+                    docker exec -it ${VITE_CONTAINER} /bin/sh
+                    ;;
+                "wpcli")
+                    docker exec -it ${WP_CLI_CONTAINER} /bin/bash
+                    ;;
+                esac
+                read -p "Press Enter to continue..." enter_key
+            fi
+            ;;
+        *)
+            log_warning "Invalid choice: $choice"
+            ;;
+        esac
+    done
+}
+
+# WP-CLI submenu
+wpcli_menu() {
+    local options=(
+        "1" "Install WordPress"
+        "2" "Create user"
+        "3" "Install plugin"
+        "4" "Install theme"
+        "5" "Enable debugging"
+        "6" "Disable debugging"
+        "7" "Run custom WP-CLI command"
+        "8" "Back to main menu"
+    )
+
+    while true; do
+        local choice
+        choice=$(whiptail --title "WP-CLI Management Menu" \
+            --nocancel \
+            --menu "Select an operation:" 17 60 8 \
+            "${options[@]}" \
+            3>&1 1>&2 2>&3)
+
+        # Exit the loop if user pressed Escape or selected nothing
+        if [[ -z "$choice" || "$choice" == "8" ]]; then
+            return 0
+        fi
+
+        case $choice in
+        "1")
+            local site_title admin_user admin_password admin_email
+            
+            site_title=$(whiptail --title "Site Title" --nocancel --inputbox "Enter site title:" 10 60 "WordPress Site" 3>&1 1>&2 2>&3)
+            admin_user=$(whiptail --title "Admin User" --nocancel --inputbox "Enter admin username:" 10 60 "admin" 3>&1 1>&2 2>&3)
+            admin_password=$(whiptail --title "Admin Password" --nocancel --passwordbox "Enter admin password:" 10 60 "admin" 3>&1 1>&2 2>&3)
+            admin_email=$(whiptail --title "Admin Email" --nocancel --inputbox "Enter admin email:" 10 60 "admin@example.com" 3>&1 1>&2 2>&3)
+            
+            run_wp_cli_command "core install --url=\"http://${DOMAIN}\" --title=\"$site_title\" --admin_user=\"$admin_user\" --admin_password=\"$admin_password\" --admin_email=\"$admin_email\"" "WordPress installed successfully!"
+            
+            whiptail --title "Success" --msgbox "WordPress installed successfully!" 10 60
+            ;;
+        "2")
+            local username email role password
+            
+            username=$(whiptail --title "Username" --nocancel --inputbox "Enter username:" 10 60 "" 3>&1 1>&2 2>&3)
+            email=$(whiptail --title "Email" --nocancel --inputbox "Enter email:" 10 60 "" 3>&1 1>&2 2>&3)
+            role=$(whiptail --title "Role" --nocancel --inputbox "Enter role:" 10 60 "subscriber" 3>&1 1>&2 2>&3)
+            password=$(whiptail --title "Password" --nocancel --passwordbox "Enter password:" 10 60 "password" 3>&1 1>&2 2>&3)
+            
+            if [[ -z "$username" || -z "$email" ]]; then
+                whiptail --title "Error" --msgbox "Username and email are required!" 10 60
+            else
+                run_wp_cli_command "user create \"$username\" \"$email\" --role=\"$role\" --user_pass=\"$password\"" "User $username created successfully!"
+                whiptail --title "Success" --msgbox "User $username created successfully!" 10 60
+            fi
+            ;;
+        "3")
+            local plugin
+            
+            plugin=$(whiptail --title "Plugin" --nocancel --inputbox "Enter plugin name:" 10 60 "" 3>&1 1>&2 2>&3)
+            
+            if [[ -z "$plugin" ]]; then
+                whiptail --title "Error" --msgbox "Plugin name is required!" 10 60
+            else
+                run_wp_cli_command "plugin install \"$plugin\" --activate" "Plugin $plugin installed and activated!"
+                whiptail --title "Success" --msgbox "Plugin $plugin installed and activated!" 10 60
+            fi
+            ;;
+        "4")
+            local theme
+            
+            theme=$(whiptail --title "Theme" --nocancel --inputbox "Enter theme name:" 10 60 "" 3>&1 1>&2 2>&3)
+            
+            if [[ -z "$theme" ]]; then
+                whiptail --title "Error" --msgbox "Theme name is required!" 10 60
+            else
+                run_wp_cli_command "theme install \"$theme\" --activate" "Theme $theme installed and activated!"
+                whiptail --title "Success" --msgbox "Theme $theme installed and activated!" 10 60
+            fi
+            ;;
+        "5")
+            log_info "Enabling WordPress debugging..."
+            local debug_settings=(
+                "WP_DEBUG true"
+                "WP_DEBUG_LOG true"
+                "WP_DEBUG_DISPLAY true"
+                "SCRIPT_DEBUG true"
+            )
+            
+            for setting in "${debug_settings[@]}"; do
+                read -r name value <<< "$setting"
+                run_wp_cli_command "config set $name $value --raw" ""
+            done
+            
+            whiptail --title "Success" --msgbox "Debugging enabled!" 10 60
+            ;;
+        "6")
+            log_info "Disabling WordPress debugging..."
+            local debug_settings=(
+                "WP_DEBUG false"
+                "WP_DEBUG_LOG false"
+                "WP_DEBUG_DISPLAY false"
+                "SCRIPT_DEBUG false"
+            )
+            
+            for setting in "${debug_settings[@]}"; do
+                read -r name value <<< "$setting"
+                run_wp_cli_command "config set $name $value --raw" ""
+            done
+            
+            whiptail --title "Success" --msgbox "Debugging disabled!" 10 60
+            ;;
+        "7")
+            local custom_cmd
+            
+            custom_cmd=$(whiptail --title "Custom Command" --nocancel --inputbox "Enter custom WP-CLI command:" 10 60 "" 3>&1 1>&2 2>&3)
+            
+            if [[ -z "$custom_cmd" ]]; then
+                whiptail --title "Error" --msgbox "Command is required!" 10 60
+            else
+                run_wp_cli_command "$custom_cmd" "Command executed!"
+                whiptail --title "Success" --msgbox "Command executed!" 10 60
+            fi
+            ;;
+        *)
+            log_warning "Invalid choice: $choice"
+            ;;
+        esac
+    done
+}
+
+# Remote database sync submenu
+remote_db_sync_menu() {
+    local options=(
+        "1" "Pull database from remote server"
+        "2" "Push database to remote server"
+        "3" "Search and replace domain in database"
+        "4" "Export database"
+        "5" "Import database"
+        "6" "Back to main menu"
+    )
+
+    while true; do
+        local choice
+        choice=$(whiptail --title "Remote Database Operations" \
+            --nocancel \
+            --menu "Select an operation:" 16 70 6 \
+            "${options[@]}" \
+            3>&1 1>&2 2>&3)
+
+        # Exit the loop if user pressed Escape or selected nothing
+        if [[ -z "$choice" || "$choice" == "6" ]]; then
+            return 0
+        fi
+
+        case $choice in
+        "1")
+            if ! whiptail --title "Warning" --yesno "This action will overwrite your local database entirely with the remote database!\n\nContinue?" 10 70; then
+                continue
+            fi
+            
+            local ssh_host db_container db_user db_pass db_name
+            
+            ssh_host=$(whiptail --title "Remote SSH Host" --nocancel --inputbox "Enter remote SSH host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
+            db_container=$(whiptail --title "Remote DB Container" --nocancel --inputbox "Enter remote DB container:" 10 60 "$REMOTE_DB_CONTAINER" 3>&1 1>&2 2>&3)
+            db_user=$(whiptail --title "Remote DB User" --nocancel --inputbox "Enter remote DB user:" 10 60 "$REMOTE_DB_USER" 3>&1 1>&2 2>&3)
+            db_pass=$(whiptail --title "Remote DB Password" --nocancel --passwordbox "Enter remote DB password:" 10 60 "$REMOTE_DB_PASSWORD" 3>&1 1>&2 2>&3)
+            db_name=$(whiptail --title "Remote DB Name" --nocancel --inputbox "Enter remote DB name:" 10 60 "$REMOTE_DB_NAME" 3>&1 1>&2 2>&3)
+            
+            log_info "Creating backup of remote database..."
+            ssh $ssh_host "docker exec $db_container mysqldump -u$db_user -p$db_pass $db_name" > dump.sql
+            
+            log_info "Importing database to local server..."
+            docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE < dump.sql
+            
+            log_info "Updating URLs in database..."
+            docker exec $WP_CLI_CONTAINER wp search-replace "$REMOTE_DOMAIN" "$LOCAL_DOMAIN" --all-tables
+            
+            whiptail --title "Success" --msgbox "Database pull complete!" 10 60
+            ;;
+        "2")
+            if ! whiptail --title "Warning" --yesno "This action will overwrite your remote database entirely with the local database!\n\nContinue?" 10 70; then
+                continue
+            fi
+            
+            local ssh_host db_container db_user db_pass db_name
+            
+            ssh_host=$(whiptail --title "Remote SSH Host" --nocancel --inputbox "Enter remote SSH host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
+            db_container=$(whiptail --title "Remote DB Container" --nocancel --inputbox "Enter remote DB container:" 10 60 "$REMOTE_DB_CONTAINER" 3>&1 1>&2 2>&3)
+            db_user=$(whiptail --title "Remote DB User" --nocancel --inputbox "Enter remote DB user:" 10 60 "$REMOTE_DB_USER" 3>&1 1>&2 2>&3)
+            db_pass=$(whiptail --title "Remote DB Password" --nocancel --passwordbox "Enter remote DB password:" 10 60 "$REMOTE_DB_PASSWORD" 3>&1 1>&2 2>&3)
+            db_name=$(whiptail --title "Remote DB Name" --nocancel --inputbox "Enter remote DB name:" 10 60 "$REMOTE_DB_NAME" 3>&1 1>&2 2>&3)
+            
+            log_info "Updating URLs in database from $LOCAL_DOMAIN to $REMOTE_DOMAIN..."
+            docker exec $WP_CLI_CONTAINER wp search-replace "$LOCAL_DOMAIN" "$REMOTE_DOMAIN" --all-tables
+            
+            log_info "Creating backup of local database with updated URLs..."
+            docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE > dump.sql
+            
+            log_info "Transferring and importing database to remote server..."
+            cat dump.sql | ssh $ssh_host "docker exec -i $db_container mysql -u$db_user -p$db_pass $db_name"
+            
+            log_info "Reverting URLs back in local database from $REMOTE_DOMAIN to $LOCAL_DOMAIN..."
+            docker exec $WP_CLI_CONTAINER wp search-replace "$REMOTE_DOMAIN" "$LOCAL_DOMAIN" --all-tables
+            
+            whiptail --title "Success" --msgbox "Database push complete!" 10 60
+            ;;
+        "3")
+            local search_str replace_str
+            
+            search_str=$(whiptail --title "Search String" --nocancel --inputbox "Enter search string:" 10 60 "" 3>&1 1>&2 2>&3)
+            replace_str=$(whiptail --title "Replace String" --nocancel --inputbox "Enter replace string:" 10 60 "" 3>&1 1>&2 2>&3)
+            
+            if [[ -z "$search_str" || -z "$replace_str" ]]; then
+                whiptail --title "Error" --msgbox "Both search and replace strings are required!" 10 60
+            else
+                docker exec $WP_CLI_CONTAINER wp search-replace "$search_str" "$replace_str" --all-tables
+                whiptail --title "Success" --msgbox "Search and replace complete!" 10 60
+            fi
+            ;;
+        "4")
+            local filename
+            
+            filename=$(whiptail --title "Output Filename" --nocancel --inputbox "Enter output filename:" 10 60 "${PROJECT_NAME}_db_backup.sql" 3>&1 1>&2 2>&3)
+            
+            docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE > "$filename"
+            whiptail --title "Success" --msgbox "Database exported to $filename!" 10 60
+            ;;
+        "5")
+            local filename
+            
+            filename=$(whiptail --title "Input Filename" --nocancel --inputbox "Enter input filename:" 10 60 "" 3>&1 1>&2 2>&3)
+            
+            if [[ -z "$filename" ]]; then
+                whiptail --title "Error" --msgbox "Filename is required!" 10 60
+            elif [[ ! -f "$filename" ]]; then
+                whiptail --title "Error" --msgbox "File not found: $filename" 10 60
+            else
+                docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE < "$filename"
+                whiptail --title "Success" --msgbox "Database imported from $filename!" 10 60
+            fi
+            ;;
+        *)
+            log_warning "Invalid choice: $choice"
+            ;;
+        esac
+    done
 }
 
 # Check for required commands
@@ -881,134 +1440,6 @@ EOF
     log_success "$config_type configurations generated!"
 }
 
-# Manage hosts file submenu
-manage_hosts_file() {
-    clear
-    local options=(
-        "Add domain to hosts file"
-        "Remove domain from hosts file"
-        "Check if domain exists in hosts file"
-        "Back to main menu"
-    )
-
-    echo -e "${BLUE}==========================================${NC}"
-    echo -e "${BLUE}         Manage Hosts File Menu          ${NC}"
-    echo -e "${BLUE}==========================================${NC}"
-
-    for i in "${!options[@]}"; do
-        printf "%3d) %s\n" $((i + 1)) "${options[i]}"
-    done
-
-    echo -e "${BLUE}==========================================${NC}"
-    read -rp "Enter your choice: " selection
-
-    case $selection in
-    1)
-        if grep -q "$DOMAIN" /etc/hosts; then
-            log_warning "Domain $DOMAIN already exists in the hosts file."
-        else
-            echo "127.0.0.1 $DOMAIN" | sudo tee -a /etc/hosts > /dev/null
-            log_success "Domain $DOMAIN added to hosts file."
-        fi
-        ;;
-    2)
-        if grep -q "$DOMAIN" /etc/hosts; then
-            sudo sed -i "/$DOMAIN/d" /etc/hosts
-            log_success "Domain $DOMAIN removed from hosts file."
-        else
-            log_warning "Domain $DOMAIN not found in the hosts file."
-        fi
-        ;;
-    3)
-        if grep -q "$DOMAIN" /etc/hosts; then
-            log_success "Domain $DOMAIN exists in the hosts file."
-        else
-            log_warning "Domain $DOMAIN does not exist in the hosts file."
-        fi
-        ;;
-    4)
-        return
-        ;;
-    *)
-        log_warning "Invalid option: $selection"
-        manage_hosts_file
-        ;;
-    esac
-}
-
-# Manage proxy container submenu
-manage_proxy_container() {
-    clear
-    local options=(
-        "Run main proxy container"
-        "Stop and remove proxy container"
-        "Check proxy container status"
-        "Back to main menu"
-    )
-
-    echo -e "${BLUE}==========================================${NC}"
-    echo -e "${BLUE}         Manage Proxy Container          ${NC}"
-    echo -e "${BLUE}==========================================${NC}"
-
-    for i in "${!options[@]}"; do
-        printf "%3d) %s\n" $((i + 1)) "${options[i]}"
-    done
-
-    echo -e "${BLUE}==========================================${NC}"
-    read -rp "Enter your choice: " selection
-
-    case $selection in
-    1)
-        # Check if ports 80 and 443 are free
-        if lsof -i:80 -i:443 &>/dev/null; then
-            log_error "Ports 80 and/or 443 are already in use. Please stop any services using these ports and try again."
-            return
-        fi
-
-        # Check if the Docker image exists, pull if not
-        if ! docker image inspect "$PROXY_IMAGE" &>/dev/null; then
-            log_info "Docker image $PROXY_IMAGE not found. Pulling the image..."
-            docker pull "$PROXY_IMAGE"
-            log_success "Docker image $PROXY_IMAGE pulled successfully."
-        fi
-
-        # Run the proxy container
-        log_info "Running the proxy container..."
-        docker run --name "$PROXY_CONTAINER_NAME" --net "$PROXY_NETWORK" -d --restart=unless-stopped \
-            -p 80:80 -p 443:443 \
-            -v /var/run/docker.sock:/tmp/docker.sock:ro \
-            -v "$PROXY_CERTS_DIR:/etc/nginx/certs" \
-            "$PROXY_IMAGE"
-        log_success "Proxy container $PROXY_CONTAINER_NAME is now running."
-        ;;
-    2)
-        # Stop and remove the proxy container
-        if docker ps -a --format '{{.Names}}' | grep -q "^$PROXY_CONTAINER_NAME\$"; then
-            log_info "Stopping and removing the proxy container..."
-            docker stop "$PROXY_CONTAINER_NAME" && docker rm "$PROXY_CONTAINER_NAME"
-            log_success "Proxy container $PROXY_CONTAINER_NAME stopped and removed."
-        else
-            log_warning "Proxy container $PROXY_CONTAINER_NAME is not running."
-        fi
-        ;;
-    3)
-        # Check the status of the proxy container
-        if docker ps --format '{{.Names}}' | grep -q "^$PROXY_CONTAINER_NAME\$"; then
-            log_success "Proxy container $PROXY_CONTAINER_NAME is running."
-        else
-            log_warning "Proxy container $PROXY_CONTAINER_NAME is not running."
-        fi
-        ;;
-    4)
-        return
-        ;;
-    *)
-        log_warning "Invalid option: $selection"
-        manage_proxy_container
-        ;;
-    esac
-}
-
 # Simplified menu handling with checkbox-style interface using whiptail
 show_menu() {
     local options=(
@@ -1097,66 +1528,79 @@ EOF
 
 # Remote sync submenu
 remote_sync_menu() {
-    clear
     local options=(
-        "Sync plugins from remote server"
-        "Sync themes from remote server"
-        "Sync uploads from remote server"
-        "Sync all content from remote server"
-        "Custom sync operation"
-        "Back to main menu"
+        "1" "Sync plugins from remote server"
+        "2" "Sync themes from remote server"
+        "3" "Sync uploads from remote server"
+        "4" "Sync all content from remote server"
+        "5" "Custom sync operation"
+        "6" "Back to main menu"
     )
 
-    echo -e "${BLUE}==========================================${NC}"
-    echo -e "${BLUE}         Remote Sync Operations          ${NC}"
-    echo -e "${BLUE}==========================================${NC}"
+    while true; do
+        local choice
+        choice=$(whiptail --title "Remote Sync Operations" \
+            --nocancel \
+            --menu "Select an operation:" 16 60 6 \
+            "${options[@]}" \
+            3>&1 1>&2 2>&3)
 
-    for i in "${!options[@]}"; do
-        printf "%3d) %s\n" $((i + 1)) "${options[i]}"
-    done
-
-    echo -e "${BLUE}==========================================${NC}"
-    read -rp "Enter your choice: " selection
-
-    case $selection in
-    1)
-        read -p "Remote host (default: gcloud): " remote_host
-        read -p "Remote path (default: ~/web/example.com): " remote_path
-        handleRemoteSync "plugins" "${remote_host:-gcloud}" "${remote_path:-~/web/example.com}"
-        ;;
-    2)
-        read -p "Remote host (default: gcloud): " remote_host
-        read -p "Remote path (default: ~/web/example.com): " remote_path
-        handleRemoteSync "themes" "${remote_host:-gcloud}" "${remote_path:-~/web/example.com}"
-        ;;
-    3)
-        read -p "Remote host (default: gcloud): " remote_host
-        read -p "Remote path (default: ~/web/example.com): " remote_path
-        handleRemoteSync "uploads" "${remote_host:-gcloud}" "${remote_path:-~/web/example.com}"
-        ;;
-    4)
-        read -p "Remote host (default: gcloud): " remote_host
-        read -p "Remote path (default: ~/web/example.com): " remote_path
-        handleRemoteSync "all" "${remote_host:-gcloud}" "${remote_path:-~/web/example.com}"
-        ;;
-    5)
-        read -p "Remote host (default: gcloud): " remote_host
-        read -p "Remote path: " remote_custom_path
-        read -p "Local path: " local_custom_path
-        if [[ -z "$remote_custom_path" || -z "$local_custom_path" ]]; then
-            log_error "Both remote and local paths are required!"
-        else
-            handleRemoteSync "custom" "${remote_host:-gcloud}" "$remote_custom_path" "$local_custom_path"
+        # Exit the loop if user pressed Escape or selected nothing
+        if [[ -z "$choice" || "$choice" == "6" ]]; then
+            return 0
         fi
-        ;;
-    6)
-        return
-        ;;
-    *)
-        log_warning "Invalid option: $selection"
-        remote_sync_menu
-        ;;
-    esac
+
+        case $choice in
+        "1")
+            local remote_host remote_path
+            remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
+            remote_path=$(whiptail --title "Remote Path" --nocancel --inputbox "Enter remote path:" 10 60 "$REMOTE_PROJECT_PATH" 3>&1 1>&2 2>&3)
+            
+            handleRemoteSync "plugins" "$remote_host" "$remote_path"
+            whiptail --title "Success" --msgbox "Plugins sync complete!" 10 60
+            ;;
+        "2")
+            local remote_host remote_path
+            remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
+            remote_path=$(whiptail --title "Remote Path" --nocancel --inputbox "Enter remote path:" 10 60 "$REMOTE_PROJECT_PATH" 3>&1 1>&2 2>&3)
+            
+            handleRemoteSync "themes" "$remote_host" "$remote_path"
+            whiptail --title "Success" --msgbox "Themes sync complete!" 10 60
+            ;;
+        "3")
+            local remote_host remote_path
+            remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
+            remote_path=$(whiptail --title "Remote Path" --nocancel --inputbox "Enter remote path:" 10 60 "$REMOTE_PROJECT_PATH" 3>&1 1>&2 2>&3)
+            
+            handleRemoteSync "uploads" "$remote_host" "$remote_path"
+            whiptail --title "Success" --msgbox "Uploads sync complete!" 10 60
+            ;;
+        "4")
+            local remote_host remote_path
+            remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
+            remote_path=$(whiptail --title "Remote Path" --nocancel --inputbox "Enter remote path:" 10 60 "$REMOTE_PROJECT_PATH" 3>&1 1>&2 2>&3)
+            
+            handleRemoteSync "all" "$remote_host" "$remote_path"
+            whiptail --title "Success" --msgbox "All content sync complete!" 10 60
+            ;;
+        "5")
+            local remote_host remote_custom_path local_custom_path
+            remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
+            remote_custom_path=$(whiptail --title "Remote Custom Path" --nocancel --inputbox "Enter remote custom path:" 10 60 "" 3>&1 1>&2 2>&3)
+            local_custom_path=$(whiptail --title "Local Custom Path" --nocancel --inputbox "Enter local custom path:" 10 60 "" 3>&1 1>&2 2>&3)
+            
+            if [[ -n "$remote_custom_path" && -n "$local_custom_path" ]]; then
+                handleRemoteSync "custom" "$remote_host" "$remote_custom_path" "$local_custom_path"
+                whiptail --title "Success" --msgbox "Custom sync complete!" 10 60
+            else
+                whiptail --title "Error" --msgbox "Both remote and local paths are required!" 10 60
+            fi
+            ;;
+        *)
+            log_warning "Invalid choice: $choice"
+            ;;
+        esac
+    done
 }
 
 # Docker management submenu
