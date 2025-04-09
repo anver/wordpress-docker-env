@@ -81,7 +81,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;36m' # Changed from light blue to cyan for better visibility
-NC='\033[0m' # No Color
+NC='\033[0m'      # No Color
 
 # Common utility functions
 log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -94,7 +94,7 @@ prompt_with_default() {
     local prompt="$1"
     local default="$2"
     local result
-    
+
     read -rp "$prompt [$default]: " result
     echo "${result:-$default}"
 }
@@ -102,7 +102,7 @@ prompt_with_default() {
 run_wp_cli_command() {
     local cmd="$1"
     local success_msg="$2"
-    
+
     log_info "Executing: wp $cmd"
     if docker exec ${WP_CLI_CONTAINER} wp $cmd; then
         if [[ -n "$success_msg" ]]; then
@@ -118,8 +118,8 @@ run_wp_cli_command() {
 # Save configuration to file
 save_config() {
     log_info "Saving configuration to $CONFIG_FILE..."
-    
-    cat > "$CONFIG_FILE" <<EOF
+
+    cat >"$CONFIG_FILE" <<EOF
 # WordPress Docker Environment Configuration
 # Generated on $(date)
 
@@ -188,7 +188,7 @@ PROXY_IMAGE="$PROXY_IMAGE"
 PROXY_CERT_FILE="$PROXY_CERT_FILE"
 PROXY_KEY_FILE="$PROXY_KEY_FILE"
 EOF
-    
+
     log_success "Configuration saved successfully!"
 }
 
@@ -477,7 +477,7 @@ manage_hosts_file() {
             if grep -q "$DOMAIN" /etc/hosts; then
                 whiptail --title "Warning" --msgbox "Domain $DOMAIN already exists in the hosts file." 10 60
             else
-                echo "127.0.0.1 $DOMAIN" | sudo tee -a /etc/hosts > /dev/null
+                echo "127.0.0.1 $DOMAIN" | sudo tee -a /etc/hosts >/dev/null
                 whiptail --title "Success" --msgbox "Domain $DOMAIN added to hosts file." 10 60
             fi
             ;;
@@ -558,7 +558,7 @@ manage_proxy_container() {
                 -v /var/run/docker.sock:/tmp/docker.sock:ro \
                 -v "$PROXY_CERTS_DIR:/etc/nginx/certs" \
                 "$PROXY_IMAGE"
-            
+
             whiptail --title "Success" --msgbox "Proxy container $PROXY_CONTAINER_NAME is now running." 10 60
             ;;
         "2")
@@ -649,7 +649,7 @@ docker_menu() {
                 "redis" "Redis container" \
                 "vite" "Vite container" \
                 3>&1 1>&2 2>&3)
-                
+
             if [[ -n "$container" ]]; then
                 clear
                 log_info "Viewing logs for $container container. Press Ctrl+C to exit."
@@ -686,7 +686,7 @@ docker_menu() {
                 "vite" "Vite container" \
                 "wpcli" "WP-CLI container" \
                 3>&1 1>&2 2>&3)
-                
+
             if [[ -n "$container" ]]; then
                 clear
                 log_info "Accessing shell for $container container. Type 'exit' to return."
@@ -750,24 +750,24 @@ wpcli_menu() {
         case $choice in
         "1")
             local site_title admin_user admin_password admin_email
-            
+
             site_title=$(whiptail --title "Site Title" --nocancel --inputbox "Enter site title:" 10 60 "WordPress Site" 3>&1 1>&2 2>&3)
             admin_user=$(whiptail --title "Admin User" --nocancel --inputbox "Enter admin username:" 10 60 "admin" 3>&1 1>&2 2>&3)
             admin_password=$(whiptail --title "Admin Password" --nocancel --passwordbox "Enter admin password:" 10 60 "admin" 3>&1 1>&2 2>&3)
             admin_email=$(whiptail --title "Admin Email" --nocancel --inputbox "Enter admin email:" 10 60 "admin@example.com" 3>&1 1>&2 2>&3)
-            
+
             run_wp_cli_command "core install --url=\"http://${DOMAIN}\" --title=\"$site_title\" --admin_user=\"$admin_user\" --admin_password=\"$admin_password\" --admin_email=\"$admin_email\"" "WordPress installed successfully!"
-            
+
             whiptail --title "Success" --msgbox "WordPress installed successfully!" 10 60
             ;;
         "2")
             local username email role password
-            
+
             username=$(whiptail --title "Username" --nocancel --inputbox "Enter username:" 10 60 "" 3>&1 1>&2 2>&3)
             email=$(whiptail --title "Email" --nocancel --inputbox "Enter email:" 10 60 "" 3>&1 1>&2 2>&3)
             role=$(whiptail --title "Role" --nocancel --inputbox "Enter role:" 10 60 "subscriber" 3>&1 1>&2 2>&3)
             password=$(whiptail --title "Password" --nocancel --passwordbox "Enter password:" 10 60 "password" 3>&1 1>&2 2>&3)
-            
+
             if [[ -z "$username" || -z "$email" ]]; then
                 whiptail --title "Error" --msgbox "Username and email are required!" 10 60
             else
@@ -777,9 +777,9 @@ wpcli_menu() {
             ;;
         "3")
             local plugin
-            
+
             plugin=$(whiptail --title "Plugin" --nocancel --inputbox "Enter plugin name:" 10 60 "" 3>&1 1>&2 2>&3)
-            
+
             if [[ -z "$plugin" ]]; then
                 whiptail --title "Error" --msgbox "Plugin name is required!" 10 60
             else
@@ -789,9 +789,9 @@ wpcli_menu() {
             ;;
         "4")
             local theme
-            
+
             theme=$(whiptail --title "Theme" --nocancel --inputbox "Enter theme name:" 10 60 "" 3>&1 1>&2 2>&3)
-            
+
             if [[ -z "$theme" ]]; then
                 whiptail --title "Error" --msgbox "Theme name is required!" 10 60
             else
@@ -807,12 +807,12 @@ wpcli_menu() {
                 "WP_DEBUG_DISPLAY true"
                 "SCRIPT_DEBUG true"
             )
-            
+
             for setting in "${debug_settings[@]}"; do
-                read -r name value <<< "$setting"
+                read -r name value <<<"$setting"
                 run_wp_cli_command "config set $name $value --raw" ""
             done
-            
+
             whiptail --title "Success" --msgbox "Debugging enabled!" 10 60
             ;;
         "6")
@@ -823,142 +823,24 @@ wpcli_menu() {
                 "WP_DEBUG_DISPLAY false"
                 "SCRIPT_DEBUG false"
             )
-            
+
             for setting in "${debug_settings[@]}"; do
-                read -r name value <<< "$setting"
+                read -r name value <<<"$setting"
                 run_wp_cli_command "config set $name $value --raw" ""
             done
-            
+
             whiptail --title "Success" --msgbox "Debugging disabled!" 10 60
             ;;
         "7")
             local custom_cmd
-            
+
             custom_cmd=$(whiptail --title "Custom Command" --nocancel --inputbox "Enter custom WP-CLI command:" 10 60 "" 3>&1 1>&2 2>&3)
-            
+
             if [[ -z "$custom_cmd" ]]; then
                 whiptail --title "Error" --msgbox "Command is required!" 10 60
             else
                 run_wp_cli_command "$custom_cmd" "Command executed!"
                 whiptail --title "Success" --msgbox "Command executed!" 10 60
-            fi
-            ;;
-        *)
-            log_warning "Invalid choice: $choice"
-            ;;
-        esac
-    done
-}
-
-# Remote database sync submenu
-remote_db_sync_menu() {
-    local options=(
-        "1" "Pull database from remote server"
-        "2" "Push database to remote server"
-        "3" "Search and replace domain in database"
-        "4" "Export database"
-        "5" "Import database"
-        "6" "Back to main menu"
-    )
-
-    while true; do
-        local choice
-        choice=$(whiptail --title "Remote Database Operations" \
-            --nocancel \
-            --menu "Select an operation:" 16 70 6 \
-            "${options[@]}" \
-            3>&1 1>&2 2>&3)
-
-        # Exit the loop if user pressed Escape or selected nothing
-        if [[ -z "$choice" || "$choice" == "6" ]]; then
-            return 0
-        fi
-
-        case $choice in
-        "1")
-            if ! whiptail --title "Warning" --yesno "This action will overwrite your local database entirely with the remote database!\n\nContinue?" 10 70; then
-                continue
-            fi
-            
-            local ssh_host db_container db_user db_pass db_name
-            
-            ssh_host=$(whiptail --title "Remote SSH Host" --nocancel --inputbox "Enter remote SSH host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
-            db_container=$(whiptail --title "Remote DB Container" --nocancel --inputbox "Enter remote DB container:" 10 60 "$REMOTE_DB_CONTAINER" 3>&1 1>&2 2>&3)
-            db_user=$(whiptail --title "Remote DB User" --nocancel --inputbox "Enter remote DB user:" 10 60 "$REMOTE_DB_USER" 3>&1 1>&2 2>&3)
-            db_pass=$(whiptail --title "Remote DB Password" --nocancel --passwordbox "Enter remote DB password:" 10 60 "$REMOTE_DB_PASSWORD" 3>&1 1>&2 2>&3)
-            db_name=$(whiptail --title "Remote DB Name" --nocancel --inputbox "Enter remote DB name:" 10 60 "$REMOTE_DB_NAME" 3>&1 1>&2 2>&3)
-            
-            log_info "Creating backup of remote database..."
-            ssh $ssh_host "docker exec $db_container mysqldump -u$db_user -p$db_pass $db_name" > dump.sql
-            
-            log_info "Importing database to local server..."
-            docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE < dump.sql
-            
-            log_info "Updating URLs in database..."
-            docker exec $WP_CLI_CONTAINER wp search-replace "$REMOTE_DOMAIN" "$LOCAL_DOMAIN" --all-tables
-            
-            whiptail --title "Success" --msgbox "Database pull complete!" 10 60
-            ;;
-        "2")
-            if ! whiptail --title "Warning" --yesno "This action will overwrite your remote database entirely with the local database!\n\nContinue?" 10 70; then
-                continue
-            fi
-            
-            local ssh_host db_container db_user db_pass db_name
-            
-            ssh_host=$(whiptail --title "Remote SSH Host" --nocancel --inputbox "Enter remote SSH host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
-            db_container=$(whiptail --title "Remote DB Container" --nocancel --inputbox "Enter remote DB container:" 10 60 "$REMOTE_DB_CONTAINER" 3>&1 1>&2 2>&3)
-            db_user=$(whiptail --title "Remote DB User" --nocancel --inputbox "Enter remote DB user:" 10 60 "$REMOTE_DB_USER" 3>&1 1>&2 2>&3)
-            db_pass=$(whiptail --title "Remote DB Password" --nocancel --passwordbox "Enter remote DB password:" 10 60 "$REMOTE_DB_PASSWORD" 3>&1 1>&2 2>&3)
-            db_name=$(whiptail --title "Remote DB Name" --nocancel --inputbox "Enter remote DB name:" 10 60 "$REMOTE_DB_NAME" 3>&1 1>&2 2>&3)
-            
-            log_info "Updating URLs in database from $LOCAL_DOMAIN to $REMOTE_DOMAIN..."
-            docker exec $WP_CLI_CONTAINER wp search-replace "$LOCAL_DOMAIN" "$REMOTE_DOMAIN" --all-tables
-            
-            log_info "Creating backup of local database with updated URLs..."
-            docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE > dump.sql
-            
-            log_info "Transferring and importing database to remote server..."
-            cat dump.sql | ssh $ssh_host "docker exec -i $db_container mysql -u$db_user -p$db_pass $db_name"
-            
-            log_info "Reverting URLs back in local database from $REMOTE_DOMAIN to $LOCAL_DOMAIN..."
-            docker exec $WP_CLI_CONTAINER wp search-replace "$REMOTE_DOMAIN" "$LOCAL_DOMAIN" --all-tables
-            
-            whiptail --title "Success" --msgbox "Database push complete!" 10 60
-            ;;
-        "3")
-            local search_str replace_str
-            
-            search_str=$(whiptail --title "Search String" --nocancel --inputbox "Enter search string:" 10 60 "" 3>&1 1>&2 2>&3)
-            replace_str=$(whiptail --title "Replace String" --nocancel --inputbox "Enter replace string:" 10 60 "" 3>&1 1>&2 2>&3)
-            
-            if [[ -z "$search_str" || -z "$replace_str" ]]; then
-                whiptail --title "Error" --msgbox "Both search and replace strings are required!" 10 60
-            else
-                docker exec $WP_CLI_CONTAINER wp search-replace "$search_str" "$replace_str" --all-tables
-                whiptail --title "Success" --msgbox "Search and replace complete!" 10 60
-            fi
-            ;;
-        "4")
-            local filename
-            
-            filename=$(whiptail --title "Output Filename" --nocancel --inputbox "Enter output filename:" 10 60 "${PROJECT_NAME}_db_backup.sql" 3>&1 1>&2 2>&3)
-            
-            docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE > "$filename"
-            whiptail --title "Success" --msgbox "Database exported to $filename!" 10 60
-            ;;
-        "5")
-            local filename
-            
-            filename=$(whiptail --title "Input Filename" --nocancel --inputbox "Enter input filename:" 10 60 "" 3>&1 1>&2 2>&3)
-            
-            if [[ -z "$filename" ]]; then
-                whiptail --title "Error" --msgbox "Filename is required!" 10 60
-            elif [[ ! -f "$filename" ]]; then
-                whiptail --title "Error" --msgbox "File not found: $filename" 10 60
-            else
-                docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE < "$filename"
-                whiptail --title "Success" --msgbox "Database imported from $filename!" 10 60
             fi
             ;;
         *)
@@ -1440,6 +1322,111 @@ EOF
     log_success "$config_type configurations generated!"
 }
 
+# Simplify repetitive code by modularizing and using helper functions
+
+# Helper function to handle remote database operations
+db_operation() {
+    local operation=$1
+    local ssh_host=${2:-$REMOTE_SSH_HOST}
+    local db_container=${3:-$REMOTE_DB_CONTAINER}
+    local db_user=${4:-$REMOTE_DB_USER}
+    local db_pass=${5:-$REMOTE_DB_PASSWORD}
+    local db_name=${6:-$REMOTE_DB_NAME}
+
+    case $operation in
+    "pull")
+        log_info "Pulling database from remote server..."
+        ssh $ssh_host "docker exec $db_container mysqldump -u$db_user -p$db_pass $db_name" >dump.sql
+        docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE <dump.sql
+        docker exec $WP_CLI_CONTAINER wp search-replace "$REMOTE_DOMAIN" "$LOCAL_DOMAIN" --all-tables
+        log_success "Database pull complete!"
+        ;;
+    "push")
+        log_info "Pushing database to remote server..."
+        docker exec $WP_CLI_CONTAINER wp search-replace "$LOCAL_DOMAIN" "$REMOTE_DOMAIN" --all-tables
+        docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE >dump.sql
+        cat dump.sql | ssh $ssh_host "docker exec -i $db_container mysql -u$db_user -p$db_pass $db_name"
+        docker exec $WP_CLI_CONTAINER wp search-replace "$REMOTE_DOMAIN" "$LOCAL_DOMAIN" --all-tables
+        log_success "Database push complete!"
+        ;;
+    *)
+        log_error "Invalid database operation: $operation"
+        ;;
+    esac
+}
+
+# Simplify remote database sync menu
+remote_db_sync_menu() {
+    local options=(
+        "1" "Pull database from remote server"
+        "2" "Push database to remote server"
+        "3" "Search and replace domain in database"
+        "4" "Export database"
+        "5" "Import database"
+        "6" "Back to main menu"
+    )
+
+    while true; do
+        local choice
+        choice=$(whiptail --title "Remote Database Operations" \
+            --nocancel \
+            --menu "Select an operation:" 16 70 6 \
+            "${options[@]}" \
+            3>&1 1>&2 2>&3)
+
+        if [[ -z "$choice" || "$choice" == "6" ]]; then
+            return 0
+        fi
+
+        case $choice in
+        "1")
+            if whiptail --title "Warning" --yesno "This action will overwrite your local database entirely with the remote database!\n\nContinue?" 10 70; then
+                db_operation "pull"
+            fi
+            ;;
+        "2")
+            if whiptail --title "Warning" --yesno "This action will overwrite your remote database entirely with the local database!\n\nContinue?" 10 70; then
+                db_operation "push"
+            fi
+            ;;
+        "3")
+            local search_str replace_str
+            search_str=$(whiptail --title "Search String" --nocancel --inputbox "Enter search string:" 10 60 "" 3>&1 1>&2 2>&3)
+            replace_str=$(whiptail --title "Replace String" --nocancel --inputbox "Enter replace string:" 10 60 "" 3>&1 1>&2 2>&3)
+
+            if [[ -z "$search_str" || -z "$replace_str" ]]; then
+                whiptail --title "Error" --msgbox "Both search and replace strings are required!" 10 60
+            else
+                docker exec $WP_CLI_CONTAINER wp search-replace "$search_str" "$replace_str" --all-tables
+                whiptail --title "Success" --msgbox "Search and replace complete!" 10 60
+            fi
+            ;;
+        "4")
+            local filename
+            filename=$(whiptail --title "Output Filename" --nocancel --inputbox "Enter output filename:" 10 60 "${PROJECT_NAME}_db_backup.sql" 3>&1 1>&2 2>&3)
+            docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE >"$filename"
+            whiptail --title "Success" --msgbox "Database exported to $filename!" 10 60
+            ;;
+        "5")
+            local filename
+            filename=$(whiptail --title "Input Filename" --nocancel --inputbox "Enter input filename:" 10 60 "" 3>&1 1>&2 2>&3)
+
+            if [[ -z "$filename" ]]; then
+                whiptail --title "Error" --msgbox "Filename is required!" 10 60
+            elif [[ ! -f "$filename" ]]; then
+                whiptail --title "Error" --msgbox "File not found: $filename" 10 60
+            else
+                docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE <"$filename"
+                whiptail --title "Success" --msgbox "Database imported from $filename!" 10 60
+            fi
+            ;;
+        *)
+            log_warning "Invalid choice: $choice"
+            ;;
+        esac
+    done
+}
+
 # Simplified menu handling with checkbox-style interface using whiptail
 show_menu() {
     local options=(
@@ -1555,7 +1542,7 @@ remote_sync_menu() {
             local remote_host remote_path
             remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
             remote_path=$(whiptail --title "Remote Path" --nocancel --inputbox "Enter remote path:" 10 60 "$REMOTE_PROJECT_PATH" 3>&1 1>&2 2>&3)
-            
+
             handleRemoteSync "plugins" "$remote_host" "$remote_path"
             whiptail --title "Success" --msgbox "Plugins sync complete!" 10 60
             ;;
@@ -1563,7 +1550,7 @@ remote_sync_menu() {
             local remote_host remote_path
             remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
             remote_path=$(whiptail --title "Remote Path" --nocancel --inputbox "Enter remote path:" 10 60 "$REMOTE_PROJECT_PATH" 3>&1 1>&2 2>&3)
-            
+
             handleRemoteSync "themes" "$remote_host" "$remote_path"
             whiptail --title "Success" --msgbox "Themes sync complete!" 10 60
             ;;
@@ -1571,7 +1558,7 @@ remote_sync_menu() {
             local remote_host remote_path
             remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
             remote_path=$(whiptail --title "Remote Path" --nocancel --inputbox "Enter remote path:" 10 60 "$REMOTE_PROJECT_PATH" 3>&1 1>&2 2>&3)
-            
+
             handleRemoteSync "uploads" "$remote_host" "$remote_path"
             whiptail --title "Success" --msgbox "Uploads sync complete!" 10 60
             ;;
@@ -1579,7 +1566,7 @@ remote_sync_menu() {
             local remote_host remote_path
             remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
             remote_path=$(whiptail --title "Remote Path" --nocancel --inputbox "Enter remote path:" 10 60 "$REMOTE_PROJECT_PATH" 3>&1 1>&2 2>&3)
-            
+
             handleRemoteSync "all" "$remote_host" "$remote_path"
             whiptail --title "Success" --msgbox "All content sync complete!" 10 60
             ;;
@@ -1588,7 +1575,7 @@ remote_sync_menu() {
             remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
             remote_custom_path=$(whiptail --title "Remote Custom Path" --nocancel --inputbox "Enter remote custom path:" 10 60 "" 3>&1 1>&2 2>&3)
             local_custom_path=$(whiptail --title "Local Custom Path" --nocancel --inputbox "Enter local custom path:" 10 60 "" 3>&1 1>&2 2>&3)
-            
+
             if [[ -n "$remote_custom_path" && -n "$local_custom_path" ]]; then
                 handleRemoteSync "custom" "$remote_host" "$remote_custom_path" "$local_custom_path"
                 whiptail --title "Success" --msgbox "Custom sync complete!" 10 60
@@ -1763,22 +1750,22 @@ remote_db_sync_menu() {
         read -p "Remote DB user (default: $REMOTE_DB_USER): " db_user
         read -p "Remote DB password (default: $REMOTE_DB_PASSWORD): " db_pass
         read -p "Remote DB name (default: $REMOTE_DB_NAME): " db_name
-        
+
         ssh_host=${ssh_host:-$REMOTE_SSH_HOST}
         db_container=${db_container:-$REMOTE_DB_CONTAINER}
         db_user=${db_user:-$REMOTE_DB_USER}
         db_pass=${db_pass:-$REMOTE_DB_PASSWORD}
         db_name=${db_name:-$REMOTE_DB_NAME}
-        
+
         log_info "Creating backup of remote database..."
-        ssh $ssh_host "docker exec $db_container mysqldump -u$db_user -p$db_pass $db_name" > dump.sql
-        
+        ssh $ssh_host "docker exec $db_container mysqldump -u$db_user -p$db_pass $db_name" >dump.sql
+
         log_info "Importing database to local server..."
-        docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE < dump.sql
-        
+        docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE <dump.sql
+
         log_info "Updating URLs in database..."
         docker exec $WP_CLI_CONTAINER wp search-replace "$REMOTE_DOMAIN" "$LOCAL_DOMAIN" --all-tables
-        
+
         log_success "Database pull complete!"
         ;;
     2)
@@ -1794,32 +1781,32 @@ remote_db_sync_menu() {
         read -p "Remote DB user (default: $REMOTE_DB_USER): " db_user
         read -p "Remote DB password (default: $REMOTE_DB_PASSWORD): " db_pass
         read -p "Remote DB name (default: $REMOTE_DB_NAME): " db_name
-        
+
         ssh_host=${ssh_host:-$REMOTE_SSH_HOST}
         db_container=${db_container:-$REMOTE_DB_CONTAINER}
         db_user=${db_user:-$REMOTE_DB_USER}
         db_pass=${db_pass:-$REMOTE_DB_PASSWORD}
         db_name=${db_name:-$REMOTE_DB_NAME}
-        
+
         log_info "Updating URLs in database from $LOCAL_DOMAIN to $REMOTE_DOMAIN..."
         docker exec $WP_CLI_CONTAINER wp search-replace "$LOCAL_DOMAIN" "$REMOTE_DOMAIN" --all-tables
-        
+
         log_info "Creating backup of local database with updated URLs..."
-        docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE > dump.sql
-        
+        docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE >dump.sql
+
         log_info "Transferring and importing database to remote server..."
         cat dump.sql | ssh $ssh_host "docker exec -i $db_container mysql -u$db_user -p$db_pass $db_name"
-        
+
         log_info "Reverting URLs back in local database from $REMOTE_DOMAIN to $LOCAL_DOMAIN..."
         docker exec $WP_CLI_CONTAINER wp search-replace "$REMOTE_DOMAIN" "$LOCAL_DOMAIN" --all-tables
-        
+
         log_success "Database push complete!"
         ;;
     3)
         log_info "Search and replace in database..."
         read -p "Search string: " search_str
         read -p "Replace string: " replace_str
-        
+
         if [[ -z "$search_str" || -z "$replace_str" ]]; then
             log_error "Both search and replace strings are required!"
         else
@@ -1831,18 +1818,18 @@ remote_db_sync_menu() {
         log_info "Exporting database..."
         read -p "Output filename (default: ${PROJECT_NAME}_db_backup.sql): " filename
         filename=${filename:-"${PROJECT_NAME}_db_backup.sql"}
-        
-        docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE > "$filename"
+
+        docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE >"$filename"
         log_success "Database exported to $filename!"
         ;;
     5)
         log_info "Importing database..."
         read -p "Input filename: " filename
-        
+
         if [[ ! -f "$filename" ]]; then
             log_error "File not found: $filename"
         else
-            docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE < "$filename"
+            docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE <"$filename"
             log_success "Database imported from $filename!"
         fi
         ;;
@@ -1899,7 +1886,7 @@ handleRemoteSync() {
 handleDocker() {
     local action=$1
     local container=$2
-    
+
     case "$action" in
     "build")
         log_info "Building and starting containers..."
@@ -1983,7 +1970,7 @@ handleDocker() {
 handleWpCli() {
     local action=$1
     shift
-    
+
     case "$action" in
     "install")
         log_info "Installing WordPress..."
@@ -1991,7 +1978,7 @@ handleWpCli() {
         local admin_user=$(prompt_with_default "Admin user" "admin")
         local admin_password=$(prompt_with_default "Admin password" "admin")
         local admin_email=$(prompt_with_default "Admin email" "admin@example.com")
-        
+
         run_wp_cli_command "core install --url=\"http://${DOMAIN}\" --title=\"$site_title\" --admin_user=\"$admin_user\" --admin_password=\"$admin_password\" --admin_email=\"$admin_email\"" "WordPress installed successfully!"
         ;;
     "create-user")
@@ -1999,7 +1986,7 @@ handleWpCli() {
         email="$2"
         role="${3:-subscriber}"
         password="${4:-password}"
-        
+
         run_wp_cli_command "user create \"$username\" \"$email\" --role=\"$role\" --user_pass=\"$password\"" "User $username created successfully!"
         ;;
     "install-plugin")
@@ -2020,9 +2007,9 @@ handleWpCli() {
             "WP_DEBUG_DISPLAY true"
             "SCRIPT_DEBUG true"
         )
-        
+
         for setting in "${debug_settings[@]}"; do
-            read -r name value <<< "$setting"
+            read -r name value <<<"$setting"
             run_wp_cli_command "config set $name $value --raw" ""
         done
         log_success "Debugging enabled!"
@@ -2035,9 +2022,9 @@ handleWpCli() {
             "WP_DEBUG_DISPLAY false"
             "SCRIPT_DEBUG false"
         )
-        
+
         for setting in "${debug_settings[@]}"; do
-            read -r name value <<< "$setting"
+            read -r name value <<<"$setting"
             run_wp_cli_command "config set $name $value --raw" ""
         done
         log_success "Debugging disabled!"
@@ -2071,7 +2058,7 @@ main() {
         log_error "This script should not be run as root!"
         exit 1
     fi
-    
+
     # Check if this is the first run
     if [[ ! -f "$CONFIG_FILE" ]]; then
         log_info "First time setup detected."
