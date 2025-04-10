@@ -7,6 +7,7 @@ A comprehensive Docker-based WordPress development environment designed for deve
 - [Features](#features)
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
+- [Step-by-Step Guide to Using the Script](#step-by-step-guide-to-using-the-script)
 - [Directory Structure](#directory-structure)
 - [Available Features](#available-features)
   - [Project Configuration](#project-configuration)
@@ -65,6 +66,71 @@ A comprehensive Docker-based WordPress development environment designed for deve
    - Build and start containers
 
 4. Access your WordPress site at the configured domain (default: http://wordpress.local).
+
+## Step-by-Step Guide to Using the Script
+
+Follow these steps to set up and manage your WordPress Docker environment using the provided script:
+
+### 1. Clone the Repository
+   ```bash
+   git clone <repository-url>
+   cd allword.local
+   ```
+
+### 2. Run the Script
+   Execute the script to access the interactive menu:
+   ```bash
+   ./run.sh
+   ```
+
+### 3. Configure the Environment
+   - Select **"Configure project settings"** to set up project-specific details like domain, database credentials, and container names.
+   - Use **"Configure advanced settings"** for additional configurations like Docker images and directories.
+
+### 4. Check Requirements
+   - Choose **"Check requirements"** to ensure all necessary tools (e.g., Docker, curl) are installed.
+
+### 5. Create Required Directories
+   - Select **"Create required directories"** to generate essential folders for data and configuration files.
+
+### 6. Generate Configuration Files
+   - Use the following options to create configuration files:
+     - **"Generate .env file"** for environment variables.
+     - **"Generate nginx.conf file"** for Nginx settings.
+     - **"Generate PHP configs"** for PHP and Xdebug settings.
+     - **"Generate development docker-compose.yml file"** for the development environment.
+     - **"Generate production docker-compose.yml file"** for the production environment.
+
+### 7. Manage Docker Containers
+   - Access the **"Docker operations menu"** to:
+     - Build and start containers.
+     - Stop, restart, or remove containers.
+     - View logs or access container shells.
+
+### 8. Manage WordPress
+   - Use the **"WordPress CLI menu"** to:
+     - Install WordPress.
+     - Create users.
+     - Install and activate plugins or themes.
+     - Enable or disable debugging.
+     - Run custom WP-CLI commands.
+
+### 9. Manage Proxy Container
+   - Select **"Manage proxy container"** to:
+     - Start or stop the proxy container.
+     - Check its status.
+
+### 10. Generate SSL Certificates
+   - Choose **"Generate certificates using mkcert"** to create SSL certificates for secure local development.
+
+### 11. Sync with Remote Servers
+   - Use the **"Remote sync operations menu"** to sync plugins, themes, uploads, or all content from a remote server.
+   - Access the **"Remote database sync menu"** to pull or push databases and perform search-and-replace operations.
+
+### 12. Exit the Script
+   - Select **"Exit"** to close the script.
+
+By following these steps, you can efficiently set up and manage your WordPress Docker environment.
 
 ## Directory Structure
 
