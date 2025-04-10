@@ -587,7 +587,7 @@ manage_proxy_container() {
 }
 
 # Docker management submenu
-docker_menu() {
+configure_docker_menu() {
     local options=(
         "1" "Build and start containers"
         "2" "Stop containers"
@@ -614,105 +614,29 @@ docker_menu() {
 
         case $choice in
         "1")
-            log_info "Building and starting containers..."
-            docker compose up -d --build
-            whiptail --title "Success" --msgbox "Containers built and started!" 10 60
+            handleDocker "build"
             ;;
         "2")
-            log_info "Stopping containers..."
-            docker compose stop
-            whiptail --title "Success" --msgbox "Containers stopped!" 10 60
+            handleDocker "stop"
             ;;
         "3")
-            log_info "Starting containers..."
-            docker compose start
-            whiptail --title "Success" --msgbox "Containers started!" 10 60
+            handleDocker "start"
             ;;
         "4")
-            log_info "Restarting containers..."
-            docker compose restart
-            whiptail --title "Success" --msgbox "Containers restarted!" 10 60
+            handleDocker "restart"
             ;;
         "5")
-            log_info "Removing containers..."
-            docker compose down
-            whiptail --title "Success" --msgbox "Containers removed!" 10 60
+            handleDocker "remove"
             ;;
         "6")
             local container
-            container=$(whiptail --title "View Logs" \
-                --nocancel \
-                --menu "Select container:" 15 60 5 \
-                "wp" "WordPress container" \
-                "db" "Database container" \
-                "nginx" "Nginx container" \
-                "redis" "Redis container" \
-                "vite" "Vite container" \
-                3>&1 1>&2 2>&3)
-
-            if [[ -n "$container" ]]; then
-                clear
-                log_info "Viewing logs for $container container. Press Ctrl+C to exit."
-                sleep 2
-                case "$container" in
-                "wp")
-                    docker logs -f ${WP_CONTAINER}
-                    ;;
-                "db")
-                    docker logs -f ${DB_CONTAINER}
-                    ;;
-                "nginx")
-                    docker logs -f ${NGINX_CONTAINER}
-                    ;;
-                "redis")
-                    docker logs -f ${REDIS_CONTAINER}
-                    ;;
-                "vite")
-                    docker logs -f ${VITE_CONTAINER}
-                    ;;
-                esac
-                read -p "Press Enter to continue..." enter_key
-            fi
+            container=$(whiptail --title "View Logs" --nocancel --inputbox "Enter container name (wp, db, nginx, redis, vite):" 10 60 "" 3>&1 1>&2 2>&3)
+            handleDocker "logs" "$container"
             ;;
         "7")
             local container
-            container=$(whiptail --title "Access Container Shell" \
-                --nocancel \
-                --menu "Select container:" 16 60 6 \
-                "wp" "WordPress container" \
-                "db" "Database container" \
-                "nginx" "Nginx container" \
-                "redis" "Redis container" \
-                "vite" "Vite container" \
-                "wpcli" "WP-CLI container" \
-                3>&1 1>&2 2>&3)
-
-            if [[ -n "$container" ]]; then
-                clear
-                log_info "Accessing shell for $container container. Type 'exit' to return."
-                sleep 2
-                case "$container" in
-                "wp")
-                    docker exec -it ${WP_CONTAINER} /bin/bash
-                    ;;
-                "db")
-                    docker exec -it ${DB_CONTAINER} /bin/bash
-                    ;;
-                "nginx")
-                    docker exec -it ${NGINX_CONTAINER} /bin/sh
-                    ;;
-                "redis")
-                    docker exec -it ${REDIS_CONTAINER} /bin/sh
-                    ;;
-                "vite")
-                    docker exec -it ${VITE_CONTAINER} /bin/sh
-                    ;;
-                "wpcli")
-                    docker exec -it ${WP_CLI_CONTAINER} /bin/bash
-                    ;;
-                esac
-                read -p "Press Enter to continue..." enter_key
-            fi
+            container=$(whiptail --title "Access Container Shell" --nocancel --inputbox "Enter container name (wp, db, nginx, redis, vite, wpcli):" 10 60 "" 3>&1 1>&2 2>&3)
+            handleDocker "shell" "$container"
             ;;
         *)
             log_warning "Invalid choice: $choice"
@@ -722,7 +646,7 @@ docker_menu() {
 }
 
 # WP-CLI submenu
-wpcli_menu() {
+configure_wpcli_menu() {
     local options=(
         "1" "Install WordPress"
         "2" "Create user"
@@ -749,16 +673,7 @@ wpcli_menu() {
 
         case $choice in
         "1")
-            local site_title admin_user admin_password admin_email
-
-            site_title=$(whiptail --title "Site Title" --nocancel --inputbox "Enter site title:" 10 60 "WordPress Site" 3>&1 1>&2 2>&3)
-            admin_user=$(whiptail --title "Admin User" --nocancel --inputbox "Enter admin username:" 10 60 "admin" 3>&1 1>&2 2>&3)
-            admin_password=$(whiptail --title "Admin Password" --nocancel --passwordbox "Enter admin password:" 10 60 "admin" 3>&1 1>&2 2>&3)
-            admin_email=$(whiptail --title "Admin Email" --nocancel --inputbox "Enter admin email:" 10 60 "admin@example.com" 3>&1 1>&2 2>&3)
-
-            run_wp_cli_command "core install --url=\"http://${DOMAIN}\" --title=\"$site_title\" --admin_user=\"$admin_user\" --admin_password=\"$admin_password\" --admin_email=\"$admin_email\"" "WordPress installed successfully!"
-
-            whiptail --title "Success" --msgbox "WordPress installed successfully!" 10 60
+            handleWpCli "install"
             ;;
         "2")
             local username email role password
@@ -768,80 +683,34 @@ wpcli_menu() {
             role=$(whiptail --title "Role" --nocancel --inputbox "Enter role:" 10 60 "subscriber" 3>&1 1>&2 2>&3)
             password=$(whiptail --title "Password" --nocancel --passwordbox "Enter password:" 10 60 "password" 3>&1 1>&2 2>&3)
 
-            if [[ -z "$username" || -z "$email" ]]; then
-                whiptail --title "Error" --msgbox "Username and email are required!" 10 60
-            else
-                run_wp_cli_command "user create \"$username\" \"$email\" --role=\"$role\" --user_pass=\"$password\"" "User $username created successfully!"
-                whiptail --title "Success" --msgbox "User $username created successfully!" 10 60
-            fi
+            handleWpCli "create-user" "$username" "$email" "$role" "$password"
             ;;
         "3")
             local plugin
 
             plugin=$(whiptail --title "Plugin" --nocancel --inputbox "Enter plugin name:" 10 60 "" 3>&1 1>&2 2>&3)
 
-            if [[ -z "$plugin" ]]; then
-                whiptail --title "Error" --msgbox "Plugin name is required!" 10 60
-            else
-                run_wp_cli_command "plugin install \"$plugin\" --activate" "Plugin $plugin installed and activated!"
-                whiptail --title "Success" --msgbox "Plugin $plugin installed and activated!" 10 60
-            fi
+            handleWpCli "install-plugin" "$plugin"
             ;;
         "4")
             local theme
 
             theme=$(whiptail --title "Theme" --nocancel --inputbox "Enter theme name:" 10 60 "" 3>&1 1>&2 2>&3)
 
-            if [[ -z "$theme" ]]; then
-                whiptail --title "Error" --msgbox "Theme name is required!" 10 60
-            else
-                run_wp_cli_command "theme install \"$theme\" --activate" "Theme $theme installed and activated!"
-                whiptail --title "Success" --msgbox "Theme $theme installed and activated!" 10 60
-            fi
+            handleWpCli "install-theme" "$theme"
             ;;
         "5")
-            log_info "Enabling WordPress debugging..."
-            local debug_settings=(
-                "WP_DEBUG true"
-                "WP_DEBUG_LOG true"
-                "WP_DEBUG_DISPLAY true"
-                "SCRIPT_DEBUG true"
-            )
-
-            for setting in "${debug_settings[@]}"; do
-                read -r name value <<<"$setting"
-                run_wp_cli_command "config set $name $value --raw" ""
-            done
-
-            whiptail --title "Success" --msgbox "Debugging enabled!" 10 60
+            handleWpCli "debug-on"
             ;;
         "6")
-            log_info "Disabling WordPress debugging..."
-            local debug_settings=(
-                "WP_DEBUG false"
-                "WP_DEBUG_LOG false"
-                "WP_DEBUG_DISPLAY false"
-                "SCRIPT_DEBUG false"
-            )
-
-            for setting in "${debug_settings[@]}"; do
-                read -r name value <<<"$setting"
-                run_wp_cli_command "config set $name $value --raw" ""
-            done
-
-            whiptail --title "Success" --msgbox "Debugging disabled!" 10 60
+            handleWpCli "debug-off"
             ;;
         "7")
             local custom_cmd
 
             custom_cmd=$(whiptail --title "Custom Command" --nocancel --inputbox "Enter custom WP-CLI command:" 10 60 "" 3>&1 1>&2 2>&3)
 
-            if [[ -z "$custom_cmd" ]]; then
-                whiptail --title "Error" --msgbox "Command is required!" 10 60
-            else
-                run_wp_cli_command "$custom_cmd" "Command executed!"
-                whiptail --title "Success" --msgbox "Command executed!" 10 60
-            fi
+            handleWpCli "custom" "$custom_cmd"
             ;;
         *)
             log_warning "Invalid choice: $choice"
@@ -1480,8 +1349,8 @@ show_menu() {
         "10") generate_configs "php" ;;
         "11") generate_configs "docker-dev" ;;
         "12") generate_configs "docker-prod" ;;
-        "13") docker_menu ;;
-        "14") wpcli_menu ;;
+        "13") configure_docker_menu ;;
+        "14") configure_wpcli_menu ;;
         "15") remote_sync_menu ;;
         "16") remote_db_sync_menu ;;
         "17")
@@ -1588,259 +1457,6 @@ remote_sync_menu() {
             ;;
         esac
     done
-}
-
-# Docker management submenu
-docker_menu() {
-    clear
-    local options=(
-        "Build and start containers"
-        "Stop containers"
-        "Start containers"
-        "Restart containers"
-        "Remove containers"
-        "View logs"
-        "Access container shell"
-        "Back to main menu"
-    )
-
-    echo -e "${BLUE}==========================================${NC}"
-    echo -e "${BLUE}         Docker Management Menu          ${NC}"
-    echo -e "${BLUE}==========================================${NC}"
-
-    for i in "${!options[@]}"; do
-        printf "%3d) %s\n" $((i + 1)) "${options[i]}"
-    done
-
-    echo -e "${BLUE}==========================================${NC}"
-    read -rp "Enter your choice: " selection
-
-    case $selection in
-    1)
-        handleDocker "build"
-        ;;
-    2)
-        handleDocker "stop"
-        ;;
-    3)
-        handleDocker "start"
-        ;;
-    4)
-        handleDocker "restart"
-        ;;
-    5)
-        handleDocker "remove"
-        ;;
-    6)
-        read -rp "Enter container name (wp, db, nginx, redis, vite): " container
-        handleDocker "logs" "$container"
-        ;;
-    7)
-        read -rp "Enter container name (wp, db, nginx, redis, vite, wpcli): " container
-        handleDocker "shell" "$container"
-        ;;
-    8)
-        return
-        ;;
-    *)
-        log_warning "Invalid option: $selection"
-        docker_menu
-        ;;
-    esac
-}
-
-# WP-CLI submenu
-wpcli_menu() {
-    clear
-    local options=(
-        "Install WordPress"
-        "Create user"
-        "Install plugin"
-        "Install theme"
-        "Enable debugging"
-        "Disable debugging"
-        "Run custom WP-CLI command"
-        "Back to main menu"
-    )
-
-    echo -e "${BLUE}==========================================${NC}"
-    echo -e "${BLUE}         WP-CLI Management Menu          ${NC}"
-    echo -e "${BLUE}==========================================${NC}"
-
-    for i in "${!options[@]}"; do
-        printf "%3d) %s\n" $((i + 1)) "${options[i]}"
-    done
-
-    echo -e "${BLUE}==========================================${NC}"
-    read -rp "Enter your choice: " selection
-
-    case $selection in
-    1)
-        handleWpCli "install"
-        ;;
-    2)
-        read -rp "Enter username: " username
-        read -rp "Enter email: " email
-        read -rp "Enter role (default: subscriber): " role
-        read -rp "Enter password (default: password): " password
-        handleWpCli "create-user" "$username" "$email" "$role" "$password"
-        ;;
-    3)
-        read -rp "Enter plugin name: " plugin
-        handleWpCli "install-plugin" "$plugin"
-        ;;
-    4)
-        read -rp "Enter theme name: " theme
-        handleWpCli "install-theme" "$theme"
-        ;;
-    5)
-        handleWpCli "debug-on"
-        ;;
-    6)
-        handleWpCli "debug-off"
-        ;;
-    7)
-        read -rp "Enter custom WP-CLI command: " command
-        handleWpCli "custom" "$command"
-        ;;
-    8)
-        return
-        ;;
-    *)
-        log_warning "Invalid option: $selection"
-        wpcli_menu
-        ;;
-    esac
-}
-
-# Remote database sync submenu
-remote_db_sync_menu() {
-    clear
-    local options=(
-        "Pull database from remote server and update local database"
-        "Push database to remote server and update remote database"
-        "Search and replace domain in database"
-        "Export database"
-        "Import database"
-        "Back to main menu"
-    )
-
-    echo -e "${BLUE}==========================================${NC}"
-    echo -e "${BLUE}       Remote Database Operations        ${NC}"
-    echo -e "${BLUE}==========================================${NC}"
-
-    for i in "${!options[@]}"; do
-        printf "%3d) %s\n" $((i + 1)) "${options[i]}"
-    done
-
-    echo -e "${BLUE}==========================================${NC}"
-    read -rp "Enter your choice: " selection
-
-    case $selection in
-    1)
-        log_info "Pulling database from remote server..."
-        log_warning "This action will overwrite your local database entirely with the remote database!"
-        read -p "Continue? (y/n): " confirm
-        if [[ "$confirm" != "y" ]]; then
-            log_info "Database pull cancelled."
-            return
-        fi
-        read -p "Remote SSH host (default: $REMOTE_SSH_HOST): " ssh_host
-        read -p "Remote DB container (default: $REMOTE_DB_CONTAINER): " db_container
-        read -p "Remote DB user (default: $REMOTE_DB_USER): " db_user
-        read -p "Remote DB password (default: $REMOTE_DB_PASSWORD): " db_pass
-        read -p "Remote DB name (default: $REMOTE_DB_NAME): " db_name
-
-        ssh_host=${ssh_host:-$REMOTE_SSH_HOST}
-        db_container=${db_container:-$REMOTE_DB_CONTAINER}
-        db_user=${db_user:-$REMOTE_DB_USER}
-        db_pass=${db_pass:-$REMOTE_DB_PASSWORD}
-        db_name=${db_name:-$REMOTE_DB_NAME}
-
-        log_info "Creating backup of remote database..."
-        ssh $ssh_host "docker exec $db_container mysqldump -u$db_user -p$db_pass $db_name" >dump.sql
-
-        log_info "Importing database to local server..."
-        docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE <dump.sql
-
-        log_info "Updating URLs in database..."
-        docker exec $WP_CLI_CONTAINER wp search-replace "$REMOTE_DOMAIN" "$LOCAL_DOMAIN" --all-tables
-
-        log_success "Database pull complete!"
-        ;;
-    2)
-        log_info "Pushing database to remote server..."
-        log_warning "This action will overwrite your remote database entirely with the local database!"
-        read -p "Continue? (y/n): " confirm
-        if [[ "$confirm" != "y" ]]; then
-            log_info "Database push cancelled."
-            return
-        fi
-        read -p "Remote SSH host (default: $REMOTE_SSH_HOST): " ssh_host
-        read -p "Remote DB container (default: $REMOTE_DB_CONTAINER): " db_container
-        read -p "Remote DB user (default: $REMOTE_DB_USER): " db_user
-        read -p "Remote DB password (default: $REMOTE_DB_PASSWORD): " db_pass
-        read -p "Remote DB name (default: $REMOTE_DB_NAME): " db_name
-
-        ssh_host=${ssh_host:-$REMOTE_SSH_HOST}
-        db_container=${db_container:-$REMOTE_DB_CONTAINER}
-        db_user=${db_user:-$REMOTE_DB_USER}
-        db_pass=${db_pass:-$REMOTE_DB_PASSWORD}
-        db_name=${db_name:-$REMOTE_DB_NAME}
-
-        log_info "Updating URLs in database from $LOCAL_DOMAIN to $REMOTE_DOMAIN..."
-        docker exec $WP_CLI_CONTAINER wp search-replace "$LOCAL_DOMAIN" "$REMOTE_DOMAIN" --all-tables
-
-        log_info "Creating backup of local database with updated URLs..."
-        docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE >dump.sql
-
-        log_info "Transferring and importing database to remote server..."
-        cat dump.sql | ssh $ssh_host "docker exec -i $db_container mysql -u$db_user -p$db_pass $db_name"
-
-        log_info "Reverting URLs back in local database from $REMOTE_DOMAIN to $LOCAL_DOMAIN..."
-        docker exec $WP_CLI_CONTAINER wp search-replace "$REMOTE_DOMAIN" "$LOCAL_DOMAIN" --all-tables
-
-        log_success "Database push complete!"
-        ;;
-    3)
-        log_info "Search and replace in database..."
-        read -p "Search string: " search_str
-        read -p "Replace string: " replace_str
-
-        if [[ -z "$search_str" || -z "$replace_str" ]]; then
-            log_error "Both search and replace strings are required!"
-        else
-            docker exec $WP_CLI_CONTAINER wp search-replace "$search_str" "$replace_str" --all-tables
-            log_success "Search and replace complete!"
-        fi
-        ;;
-    4)
-        log_info "Exporting database..."
-        read -p "Output filename (default: ${PROJECT_NAME}_db_backup.sql): " filename
-        filename=${filename:-"${PROJECT_NAME}_db_backup.sql"}
-
-        docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE >"$filename"
-        log_success "Database exported to $filename!"
-        ;;
-    5)
-        log_info "Importing database..."
-        read -p "Input filename: " filename
-
-        if [[ ! -f "$filename" ]]; then
-            log_error "File not found: $filename"
-        else
-            docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE <"$filename"
-            log_success "Database imported from $filename!"
-        fi
-        ;;
-    6)
-        return
-        ;;
-    *)
-        log_warning "Invalid option: $selection"
-        remote_db_sync_menu
-        ;;
-    esac
 }
 
 # Handle remote sync operations
