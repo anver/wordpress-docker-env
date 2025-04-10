@@ -1224,7 +1224,7 @@ db_operation() {
     esac
 }
 
-# Simplify remote database sync menu
+# Remote database operations submenu
 remote_db_sync_menu() {
     local options=(
         "1" "Pull database from remote server"
@@ -1239,7 +1239,7 @@ remote_db_sync_menu() {
         local choice
         choice=$(whiptail --title "Remote Database Operations" \
             --nocancel \
-            --menu "Select an operation:" 16 70 6 \
+            --menu "\nRemote and Local Database Details:\n----------------------------------------------\n| Remote Details          | Local Details    |\n----------------------------------------------\n| SSH Host: $REMOTE_SSH_HOST | DB Container: $DB_CONTAINER |\n| DB Container: $REMOTE_DB_CONTAINER | DB User: $MYSQL_USER |\n| DB User: $REMOTE_DB_USER | DB Name: $MYSQL_DATABASE |\n| DB Name: $REMOTE_DB_NAME | Domain: $LOCAL_DOMAIN |\n| Domain: $REMOTE_DOMAIN   |                  |\n----------------------------------------------\n\nSelect an operation:" 20 70 6 \
             "${options[@]}" \
             3>&1 1>&2 2>&3)
 
