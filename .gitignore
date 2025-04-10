@@ -1,1 +1,6 @@
 wordpress-docker.conf
+.env
+config
+data
+docker-compose.yaml
+wordpress-docker.conf
