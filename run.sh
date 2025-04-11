@@ -63,7 +63,7 @@ REMOTE_DOMAIN=${REMOTE_DOMAIN:-"example.com"}
 # Proxy container settings
 PROXY_CONTAINER_NAME=${PROXY_CONTAINER_NAME:-"proxy"}
 PROXY_NETWORK=${PROXY_NETWORK:-"proxy"}
-PROXY_CERTS_DIR=${PROXY_CERTS_DIR:-"~/certs"}
+PROXY_CERTS_DIR=${PROXY_CERTS_DIR:-"${HOME}/certs"}
 PROXY_IMAGE=${PROXY_IMAGE:-"nginxproxy/nginx-proxy:alpine"}
 PROXY_CERT_FILE=${PROXY_CERT_FILE:-"allword.local.crt"}
 PROXY_KEY_FILE=${PROXY_KEY_FILE:-"allword.local.key"}
@@ -763,6 +763,18 @@ generate_certs() {
         return
     fi
 
+    # Set default proxy certs directory to user's home directory appended with 'certs'
+    local default_proxy_certs_dir="$HOME/certs"
+
+    # Prompt user to set proxy certs directory
+    local new_proxy_certs_dir
+    new_proxy_certs_dir=$(whiptail --title "Set Proxy Certs Directory" --nocancel --inputbox "Enter the directory to save proxy certificates:" 10 60 "$default_proxy_certs_dir" 3>&1 1>&2 2>&3)
+    if [[ -n "$new_proxy_certs_dir" ]]; then
+        PROXY_CERTS_DIR="$new_proxy_certs_dir"
+    else
+        PROXY_CERTS_DIR="$default_proxy_certs_dir"
+    fi
+
     log_info "Generating certificates using mkcert..."
     mkdir -p "$PROXY_CERTS_DIR"
     mkcert -cert-file "$PROXY_CERTS_DIR/$PROXY_CERT_FILE" -key-file "$PROXY_CERTS_DIR/$PROXY_KEY_FILE" "$DOMAIN" "*.$DOMAIN"
@@ -825,6 +837,12 @@ PHP_INI=$CONFIG_DIR/php/php.ini
 NGINX_CONFIG=$CONFIG_DIR/nginx/nginx.conf
 USER_ID=$USER_ID
 GROUP_ID=$GROUP_ID
+PROXY_CONTAINER_NAME=$PROXY_CONTAINER_NAME
+PROXY_NETWORK=$PROXY_NETWORK
+PROXY_CERTS_DIR=$PROXY_CERTS_DIR
+PROXY_IMAGE=$PROXY_IMAGE
+PROXY_CERT_FILE=$PROXY_CERT_FILE
+PROXY_KEY_FILE=$PROXY_KEY_FILE
 EOF
         ;;
 
@@ -1034,7 +1052,7 @@ services:
       DOMAIN_CURRENT_SITE: $DOMAIN
       VITE_DEV_SERVER_ADDRESS: "https://$VITE_DEV_SERVER"
     depends_on:
-      - $WP_CONTAINER
+      - $DB_CONTAINER
 
   $WP_CLI_CONTAINER:
     container_name: $WP_CLI_CONTAINER
@@ -1049,7 +1067,7 @@ services:
       WORDPRESS_DB_USER: \${MYSQL_USER}
       WORDPRESS_DB_PASSWORD: \${MYSQL_PASSWORD}
     depends_on:
-      - $WP_CONTAINER
+      - $DB_CONTAINER
     command: tail -f /dev/null
 
   $REDIS_CONTAINER:
@@ -1140,7 +1158,7 @@ services:
       WORDPRESS_REDIS_HOST: $REDIS_CONTAINER
       DOMAIN_CURRENT_SITE: $DOMAIN
     depends_on:
-      - $WP_CONTAINER
+      - $DB_CONTAINER
 
   $NGINX_CONTAINER:
     image: $NGINX_IMAGE
