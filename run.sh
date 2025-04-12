@@ -117,41 +117,36 @@ run_wp_cli_command() {
     fi
 }
 
-# Define an array for plugin paths
-WP_PLUGIN_PATHS=(
-    "/media/anver/work/plugins/my-plugin:/var/www/html/wp-content/plugin/my-plugin"
-    # Add more plugin paths here as needed
-)
+# Refactored function to handle both plugin and vite mappings
+generate_mappings() {
+    local mappings=""
+    local -n array_ref=$1
+    for item in "${array_ref[@]}"; do
+        mappings+="      - $item\n"
+    done
+    echo -e "$mappings"
+}
 
-# Load plugin paths from configuration file
-if [[ -n "$WP_PLUGIN_PATHS" ]]; then
-    log_info "Loading plugin paths from configuration file..."
+# Update calls to use the refactored function
+get_plugin_mappings() {
+    generate_mappings WP_PLUGIN_PATHS
+}
+
+get_vite_plugin_mappings() {
+    generate_mappings VITE_PLUGIN_PATHS
+}
+
+# Ensure WP_PLUGIN_PATHS is properly initialized and formatted
+if [[ -z "${WP_PLUGIN_PATHS[*]}" ]]; then
+    log_info "Loading wp plugin paths from configuration file..."
     eval "WP_PLUGIN_PATHS=($WP_PLUGIN_PATHS)"
 fi
-
-# Function to generate plugin mappings for docker-compose
-get_plugin_mappings() {
-    local plugin_mappings=""
-    for plugin in "${WP_PLUGIN_PATHS[@]}"; do
-        plugin_mappings+="      - $plugin\n"
-    done
-    echo -e "$plugin_mappings"
-}
 
 # Load vite plugin paths from configuration file
 if [[ -n "$VITE_PLUGIN_PATHS" ]]; then
     log_info "Loading vite plugin paths from configuration file..."
     eval "VITE_PLUGIN_PATHS=($VITE_PLUGIN_PATHS)"
 fi
-
-# Function to generate vite plugin mappings for docker-compose
-get_vite_plugin_mappings() {
-    local vite_plugin_mappings=""
-    for plugin in "${VITE_PLUGIN_PATHS[@]}"; do
-        vite_plugin_mappings+="      - $plugin\n"
-    done
-    echo -e "$vite_plugin_mappings"
-}
 
 # Save configuration to file
 save_config() {
