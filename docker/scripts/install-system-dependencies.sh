@@ -24,11 +24,10 @@ apk --no-cache add \
     make \
     gcc \
     g++ \
-    libc-dev \
-    php-dev
+    libc-dev
 
 # Clean up unnecessary build dependencies to reduce image size
-apk del --no-cache autoconf make gcc g++ libc-dev php-dev
+apk del --no-cache autoconf make gcc g++ libc-dev
 
 # Clean up
 rm -rf /var/cache/apk/*

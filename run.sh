@@ -12,8 +12,9 @@ VITE_DEV_SERVER=${VITE_DEV_SERVER:-"vite.wordpress.local"}
 DB_IMAGE=${DB_IMAGE:-"mariadb:latest"}
 WP_IMAGE=${WP_IMAGE:-"wordpress:php8.4-fpm"}
 WP_UNIT_TESTING_IMAGE=${WP_UNIT_TESTING_IMAGE:-"wordpress:php8.4-fpm"}
-NGINX_IMAGE=${NGINX_IMAGE:-"nginx:alpine"}
+NGINX_IMAGE=${NGINX_IMAGE:-"nginx:alpine-slim"}
 NODE_IMAGE=${NODE_IMAGE:-"node:23-alpine"}
+REDIS_IMAGE=${REDIS_IMAGE:-"redis:alpine"}
 
 # Directory paths
 DATA_DIR=${DATA_DIR:-"./data"}
@@ -134,6 +135,7 @@ WP_IMAGE="$WP_IMAGE"
 WP_UNIT_TESTING_IMAGE="$WP_UNIT_TESTING_IMAGE"
 NGINX_IMAGE="$NGINX_IMAGE"
 NODE_IMAGE="$NODE_IMAGE"
+REDIS_IMAGE="$REDIS_IMAGE"
 
 # Directory paths
 DATA_DIR="$DATA_DIR"
@@ -327,20 +329,21 @@ configure_advanced() {
         "3" "DB image: $DB_IMAGE"
         "4" "Nginx image: $NGINX_IMAGE"
         "5" "Node image: $NODE_IMAGE"
-        "6" "Data directory: $DATA_DIR"
-        "7" "Config directory: $CONFIG_DIR"
-        "8" "Docker directory: $DOCKER_DIR"
-        "9" "WordPress table prefix: $WP_TABLE_PREFIX"
-        "10" "WordPress debug: $WP_DEBUG"
-        "11" "Production Docker network: $DOCKER_PROD_NETWORK"
-        "12" "Save configuration and return"
+        "6" "Redis image: $REDIS_IMAGE"
+        "7" "Data directory: $DATA_DIR"
+        "8" "Config directory: $CONFIG_DIR"
+        "9" "Docker directory: $DOCKER_DIR"
+        "10" "WordPress table prefix: $WP_TABLE_PREFIX"
+        "11" "WordPress debug: $WP_DEBUG"
+        "12" "Production Docker network: $DOCKER_PROD_NETWORK"
+        "13" "Save configuration and return"
     )
 
     while true; do
         local choice
         choice=$(whiptail --title "Advanced Configuration" \
             --nocancel \
-            --menu "Select setting to modify:" 20 76 12 \
+            --menu "Select setting to modify:" 20 76 13 \
             "${options[@]}" \
             3>&1 1>&2 2>&3)
 
@@ -391,54 +394,62 @@ configure_advanced() {
             fi
             ;;
         "6")
+            local new_redis_image
+            new_redis_image=$(whiptail --title "Redis Image" --nocancel --inputbox "Enter Redis image:" 10 60 "$REDIS_IMAGE" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_redis_image" ]]; then
+                REDIS_IMAGE="$new_redis_image"
+                options[11]="Redis image: $REDIS_IMAGE"
+            fi
+            ;;
+        "7")
             local new_data_dir
             new_data_dir=$(whiptail --title "Data Directory" --nocancel --inputbox "Enter data directory path:" 10 60 "$DATA_DIR" 3>&1 1>&2 2>&3)
             if [[ $? -eq 0 && -n "$new_data_dir" ]]; then
                 DATA_DIR="$new_data_dir"
-                options[11]="Data directory: $DATA_DIR"
+                options[13]="Data directory: $DATA_DIR"
             fi
             ;;
-        "7")
+        "8")
             local new_config_dir
             new_config_dir=$(whiptail --title "Config Directory" --nocancel --inputbox "Enter config directory path:" 10 60 "$CONFIG_DIR" 3>&1 1>&2 2>&3)
             if [[ $? -eq 0 && -n "$new_config_dir" ]]; then
                 CONFIG_DIR="$new_config_dir"
-                options[13]="Config directory: $CONFIG_DIR"
+                options[15]="Config directory: $CONFIG_DIR"
             fi
             ;;
-        "8")
+        "9")
             local new_docker_dir
             new_docker_dir=$(whiptail --title "Docker Directory" --nocancel --inputbox "Enter docker directory path:" 10 60 "$DOCKER_DIR" 3>&1 1>&2 2>&3)
             if [[ $? -eq 0 && -n "$new_docker_dir" ]]; then
                 DOCKER_DIR="$new_docker_dir"
-                options[15]="Docker directory: $DOCKER_DIR"
+                options[17]="Docker directory: $DOCKER_DIR"
             fi
             ;;
-        "9")
+        "10")
             local new_wp_table_prefix
             new_wp_table_prefix=$(whiptail --title "WordPress Table Prefix" --nocancel --inputbox "Enter WordPress table prefix:" 10 60 "$WP_TABLE_PREFIX" 3>&1 1>&2 2>&3)
             if [[ $? -eq 0 && -n "$new_wp_table_prefix" ]]; then
                 WP_TABLE_PREFIX="$new_wp_table_prefix"
-                options[17]="WordPress table prefix: $WP_TABLE_PREFIX"
+                options[19]="WordPress table prefix: $WP_TABLE_PREFIX"
             fi
             ;;
-        "10")
+        "11")
             local new_wp_debug
             new_wp_debug=$(whiptail --title "WordPress Debug" --nocancel --inputbox "Enter WordPress debug (true/false):" 10 60 "$WP_DEBUG" 3>&1 1>&2 2>&3)
             if [[ $? -eq 0 && -n "$new_wp_debug" ]]; then
                 WP_DEBUG="$new_wp_debug"
-                options[19]="WordPress debug: $WP_DEBUG"
+                options[21]="WordPress debug: $WP_DEBUG"
             fi
             ;;
-        "11")
+        "12")
             local new_docker_prod_network
             new_docker_prod_network=$(whiptail --title "Production Docker Network" --nocancel --inputbox "Enter production Docker network:" 10 60 "$DOCKER_PROD_NETWORK" 3>&1 1>&2 2>&3)
             if [[ $? -eq 0 && -n "$new_docker_prod_network" ]]; then
                 DOCKER_PROD_NETWORK="$new_docker_prod_network"
-                options[21]="Production Docker network: $DOCKER_PROD_NETWORK"
+                options[23]="Production Docker network: $DOCKER_PROD_NETWORK"
             fi
             ;;
-        "12")
+        "13")
             save_config
             log_success "Configuration saved!"
             return 0
@@ -1082,18 +1093,6 @@ EOF
     "docker-dev")
         cat <<EOF >docker-compose.yaml
 services:
-  $DB_CONTAINER:
-    container_name: $DB_CONTAINER
-    image: $DB_IMAGE
-    restart: unless-stopped
-    volumes:
-      - $DATA_DIR/mysql:/var/lib/mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: \${MYSQL_DATABASE}
-      MYSQL_USER: \${MYSQL_USER}
-      MYSQL_PASSWORD: \${MYSQL_PASSWORD}
-
   $WP_CONTAINER:
     container_name: $WP_CONTAINER
     image: $WP_UNIT_TESTING_IMAGE
@@ -1101,7 +1100,6 @@ services:
     volumes:
       - $DATA_DIR/site:/var/www/html
       - $CONFIG_DIR/php:/usr/local/etc/php/conf.d
-      # For plugins and themes under development
       - /media/anver/work/plugins:/var/www/html/wp-content/plugins-dev
       - /media/anver/work/themes:/var/www/html/wp-content/themes-dev
     environment:
@@ -1122,6 +1120,28 @@ services:
     depends_on:
       - $DB_CONTAINER
 
+  $NGINX_CONTAINER:
+    image: $NGINX_IMAGE
+    container_name: $NGINX_CONTAINER
+    restart: unless-stopped
+    volumes:
+      - $CONFIG_DIR/nginx:/etc/nginx/conf.d
+      - $CONFIG_DIR/nginx/includes:/etc/nginx/my_include_files
+      - $DATA_DIR/site:/var/www/html
+      - /media/anver/work/plugins:/var/www/html/wp-content/plugins-dev
+      - /media/anver/work/themes:/var/www/html/wp-content/themes-dev
+    environment:
+      - VIRTUAL_HOST=$DOMAIN,www.$DOMAIN
+      - VIRTUAL_PORT=80
+      - VIRTUAL_PROTO=http
+    depends_on:
+      - $WP_CONTAINER
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   $WP_CLI_CONTAINER:
     container_name: $WP_CLI_CONTAINER
     image: wordpress:cli
@@ -1137,37 +1157,17 @@ services:
       - $DB_CONTAINER
     command: tail -f /dev/null
 
-  $REDIS_CONTAINER:
-    container_name: $REDIS_CONTAINER
-    image: redis:7.2-alpine
+  $DB_CONTAINER:
+    container_name: $DB_CONTAINER
+    image: $DB_IMAGE
     restart: unless-stopped
     volumes:
-      - $DATA_DIR/redis:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  $NGINX_CONTAINER:
-    image: $NGINX_IMAGE
-    container_name: $NGINX_CONTAINER
-    restart: unless-stopped
-    volumes:
-      - $CONFIG_DIR/nginx:/etc/nginx/conf.d
-      - $CONFIG_DIR/nginx/includes:/etc/nginx/my_include_files
-      - $DATA_DIR/site:/var/www/html
+      - $DATA_DIR/mysql:/var/lib/mysql
     environment:
-      - VIRTUAL_HOST=$DOMAIN,www.$DOMAIN
-      - VIRTUAL_PORT=80
-      - VIRTUAL_PROTO=http
-    depends_on:
-      - $WP_CONTAINER
-    healthcheck:
-      test: ["CMD", "nginx", "-t"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: \${MYSQL_DATABASE}
+      MYSQL_USER: \${MYSQL_USER}
+      MYSQL_PASSWORD: \${MYSQL_PASSWORD}
 
   $VITE_CONTAINER:
     container_name: $VITE_CONTAINER
@@ -1193,18 +1193,6 @@ EOF
     "docker-prod")
         cat <<EOF >docker-compose.prod.yaml
 services:
-  $DB_CONTAINER:
-    container_name: $DB_CONTAINER
-    image: $DB_IMAGE
-    restart: unless-stopped
-    volumes:
-      - $DATA_DIR/mysql:/var/lib/mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: \${MYSQL_DATABASE}
-      MYSQL_USER: \${MYSQL_USER}
-      MYSQL_PASSWORD: \${MYSQL_PASSWORD}
-
   $WP_CONTAINER:
     container_name: $WP_CONTAINER
     image: $WP_IMAGE
@@ -1249,9 +1237,21 @@ services:
       timeout: 5s
       retries: 3
 
+  $DB_CONTAINER:
+    container_name: $DB_CONTAINER
+    image: $DB_IMAGE
+    restart: unless-stopped
+    volumes:
+      - $DATA_DIR/mysql:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: \${MYSQL_DATABASE}
+      MYSQL_USER: \${MYSQL_USER}
+      MYSQL_PASSWORD: \${MYSQL_PASSWORD}
+
   $REDIS_CONTAINER:
     container_name: $REDIS_CONTAINER
-    image: redis:7.2.5-alpine
+    image: $REDIS_IMAGE
     restart: unless-stopped
     volumes:
       - $DATA_DIR/redis:/data
