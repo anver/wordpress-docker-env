@@ -719,6 +719,64 @@ configure_wpcli_menu() {
     done
 }
 
+# Manage Docker images submenu
+manage_docker_images_menu() {
+    local options=(
+        "1" "Build development image (Current: $WP_UNIT_TESTING_IMAGE)"
+        "2" "Build production image (Current: $WP_IMAGE)"
+        "3" "Edit image versions"
+        "4" "Back to main menu"
+    )
+
+    while true; do
+        local choice
+        choice=$(whiptail --title "Manage Docker Images" \
+            --nocancel \
+            --menu "Select an option:" 15 60 4 \
+            "${options[@]}" \
+            3>&1 1>&2 2>&3)
+
+        if [[ -z "$choice" || "$choice" == "4" ]]; then
+            return 0
+        fi
+
+        case $choice in
+        "1")
+            log_info "Building development image: $WP_UNIT_TESTING_IMAGE..."
+            docker build -f docker/Dockerfile.dev -t $WP_UNIT_TESTING_IMAGE .
+            log_success "Development image built successfully!"
+            ;;
+        "2")
+            log_info "Building production image: $WP_IMAGE..."
+            docker build -f docker/Dockerfile.prod -t $WP_IMAGE .
+            log_success "Production image built successfully!"
+            ;;
+        "3")
+            local new_dev_image new_prod_image
+
+            new_dev_image=$(whiptail --title "Edit Development Image" --nocancel --inputbox "Enter new development image version (Current: $WP_UNIT_TESTING_IMAGE):" 10 60 "$WP_UNIT_TESTING_IMAGE" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_dev_image" ]]; then
+                WP_UNIT_TESTING_IMAGE="$new_dev_image"
+                log_success "Development image version updated to $WP_UNIT_TESTING_IMAGE"
+            fi
+
+            new_prod_image=$(whiptail --title "Edit Production Image" --nocancel --inputbox "Enter new production image version (Current: $WP_IMAGE):" 10 60 "$WP_IMAGE" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_prod_image" ]]; then
+                WP_IMAGE="$new_prod_image"
+                log_success "Production image version updated to $WP_IMAGE"
+            fi
+
+            # Update menu options to reflect new versions
+            options[1]="1 Build development image (Current: $WP_UNIT_TESTING_IMAGE)"
+            options[3]="2 Build production image (Current: $WP_IMAGE)"
+            ;;
+        *)
+            log_warning "Invalid choice: $choice"
+            ;;
+        esac
+    done
+}
+
 # Check for required commands
 check_requirements() {
     log_info "Checking requirements..."
@@ -875,6 +933,11 @@ expose_php = Off
 display_errors = Off
 log_errors = On
 error_log = /var/log/php/error.log
+extension=mysqli
+extension=exif
+extension=gd
+extension=intl
+extension=imagick
 
 [Date]
 date.timezone = "UTC"
@@ -899,6 +962,11 @@ log_errors = On
 memory_limit = 1536M
 max_execution_time = 1200
 max_input_time = 1200
+extension=mysqli
+extension=exif
+extension=gd
+extension=intl
+extension=imagick
 EOF
         ;;
 
@@ -996,7 +1064,7 @@ add_header X-Frame-Options "SAMEORIGIN" always;
 add_header X-XSS-Protection "1; mode=block" always;
 add_header X-Content-Type-Options "nosniff" always;
 add_header Referrer-Policy "no-referrer-when-downgrade" always;
-add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'; frame-ancestors 'self';" always;
+add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval';" always;
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
 # Prevent access to sensitive files
@@ -1060,7 +1128,6 @@ services:
     user: "\${USER_ID}:\${GROUP_ID}"
     volumes:
       - $DATA_DIR/site:/var/www/html
-      - ./scripts:/scripts
     environment:
       WORDPRESS_DB_HOST: $DB_CONTAINER:3306
       WORDPRESS_DB_NAME: \${MYSQL_DATABASE}
@@ -1336,7 +1403,8 @@ show_menu() {
         "17" "Generate WP-CLI aliases file" "OFF"
         "18" "List all docker networks" "OFF"
         "19" "Create docker network" "OFF"
-        "20" "Exit" "OFF"
+        "20" "Manage Docker images menu" "OFF"
+        "21" "Exit" "OFF"
     )
 
     local choices
@@ -1387,7 +1455,8 @@ EOF
             read -p "Press Enter to continue..." enter_key
             ;;
         "19") createDockerNetwork ;;
-        "20")
+        "20") manage_docker_images_menu ;;
+        "21")
             log_info "Exiting..."
             exit 0
             ;;
@@ -1699,6 +1768,9 @@ main() {
         log_info "Let's configure your WordPress environment."
         configure_project
     fi
+
+    # Ensure PHP configurations are regenerated
+    generate_configs "php"
 
     # Keep showing menu until user exits
     while true; do
