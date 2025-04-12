@@ -1176,12 +1176,12 @@ services:
     volumes:
       - .:/app
     working_dir: /app
-    command: yarn start
     environment:
       VIRTUAL_HOST: "www.$VITE_DEV_SERVER,$VITE_DEV_SERVER"
       VIRTUAL_PORT: 3000
       VIRTUAL_PROTO: http
       VITE_DEV_SERVER_ADDRESS: "https://$VITE_DEV_SERVER"
+    command: tail -f /dev/null
 
 networks:
   default:
