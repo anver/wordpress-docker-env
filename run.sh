@@ -15,6 +15,7 @@ WP_UNIT_TESTING_IMAGE=${WP_UNIT_TESTING_IMAGE:-"wordpress:php8.4-fpm"}
 NGINX_IMAGE=${NGINX_IMAGE:-"nginx:alpine-slim"}
 NODE_IMAGE=${NODE_IMAGE:-"node:23-alpine"}
 REDIS_IMAGE=${REDIS_IMAGE:-"redis:alpine"}
+VITE_IMAGE=${VITE_IMAGE:-"vite-app:latest"}
 
 # Directory paths
 DATA_DIR=${DATA_DIR:-"./data"}
@@ -136,6 +137,7 @@ WP_UNIT_TESTING_IMAGE="$WP_UNIT_TESTING_IMAGE"
 NGINX_IMAGE="$NGINX_IMAGE"
 NODE_IMAGE="$NODE_IMAGE"
 REDIS_IMAGE="$REDIS_IMAGE"
+VITE_IMAGE="$VITE_IMAGE"
 
 # Directory paths
 DATA_DIR="$DATA_DIR"
@@ -328,7 +330,7 @@ configure_advanced() {
         "2" "WordPress dev image: $WP_UNIT_TESTING_IMAGE"
         "3" "DB image: $DB_IMAGE"
         "4" "Nginx image: $NGINX_IMAGE"
-        "5" "Node image: $NODE_IMAGE"
+        "5" "Vite image: $VITE_IMAGE"
         "6" "Redis image: $REDIS_IMAGE"
         "7" "Data directory: $DATA_DIR"
         "8" "Config directory: $CONFIG_DIR"
@@ -386,12 +388,15 @@ configure_advanced() {
             fi
             ;;
         "5")
-            local new_node_image
-            new_node_image=$(whiptail --title "Node Image" --nocancel --inputbox "Enter Node image:" 10 60 "$NODE_IMAGE" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_node_image" ]]; then
-                NODE_IMAGE="$new_node_image"
-                options[9]="Node image: $NODE_IMAGE"
+            local new_vite_image
+            new_vite_image=$(whiptail --title "Edit Vite Image" --nocancel --inputbox "Enter new Vite image version (Current: $VITE_IMAGE):" 10 60 "$VITE_IMAGE" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_vite_image" ]]; then
+                VITE_IMAGE="$new_vite_image"
+                log_success "Vite image version updated to $VITE_IMAGE"
             fi
+
+            # Update menu options to reflect the new version
+            options[9]="Vite image: $VITE_IMAGE"
             ;;
         "6")
             local new_redis_image
@@ -735,35 +740,41 @@ manage_docker_images_menu() {
     local options=(
         "1" "Build development image (Current: $WP_UNIT_TESTING_IMAGE)"
         "2" "Build production image (Current: $WP_IMAGE)"
-        "3" "Edit image versions"
-        "4" "Back to main menu"
+        "3" "Build Vite image (Current: $VITE_IMAGE)"
+        "4" "Edit image versions"
+        "5" "Back to main menu"
     )
 
     while true; do
         local choice
         choice=$(whiptail --title "Manage Docker Images" \
             --nocancel \
-            --menu "Select an option:" 15 60 4 \
+            --menu "Select an option:" 15 60 5 \
             "${options[@]}" \
             3>&1 1>&2 2>&3)
 
-        if [[ -z "$choice" || "$choice" == "4" ]]; then
+        if [[ -z "$choice" || "$choice" == "5" ]]; then
             return 0
         fi
 
         case $choice in
         "1")
             log_info "Building development image: $WP_UNIT_TESTING_IMAGE..."
-            docker build -f docker/Dockerfile.dev -t $WP_UNIT_TESTING_IMAGE .
+            docker build -f docker/wp/Dockerfile.dev -t $WP_UNIT_TESTING_IMAGE .
             log_success "Development image built successfully!"
             ;;
         "2")
             log_info "Building production image: $WP_IMAGE..."
-            docker build -f docker/Dockerfile.prod -t $WP_IMAGE .
+            docker build -f docker/wp/Dockerfile.prod -t $WP_IMAGE .
             log_success "Production image built successfully!"
             ;;
         "3")
-            local new_dev_image new_prod_image
+            log_info "Building Vite image: $VITE_IMAGE..."
+            docker build -f docker/vite/Dockerfile.prod -t $VITE_IMAGE .
+            log_success "Vite image built and tagged as $VITE_IMAGE!"
+            ;;
+        "4")
+            local new_dev_image new_prod_image new_vite_image
 
             new_dev_image=$(whiptail --title "Edit Development Image" --nocancel --inputbox "Enter new development image version (Current: $WP_UNIT_TESTING_IMAGE):" 10 60 "$WP_UNIT_TESTING_IMAGE" 3>&1 1>&2 2>&3)
             if [[ $? -eq 0 && -n "$new_dev_image" ]]; then
@@ -777,9 +788,16 @@ manage_docker_images_menu() {
                 log_success "Production image version updated to $WP_IMAGE"
             fi
 
+            new_vite_image=$(whiptail --title "Edit Vite Image" --nocancel --inputbox "Enter new Vite image version (Current: $VITE_IMAGE):" 10 60 "$VITE_IMAGE" 3>&1 1>&2 2>&3)
+            if [[ $? -eq 0 && -n "$new_vite_image" ]]; then
+                VITE_IMAGE="$new_vite_image"
+                log_success "Vite image version updated to $VITE_IMAGE"
+            fi
+
             # Update menu options to reflect new versions
             options[1]="1 Build development image (Current: $WP_UNIT_TESTING_IMAGE)"
             options[3]="2 Build production image (Current: $WP_IMAGE)"
+            options[5]="3 Build Vite image (Current: $VITE_IMAGE)"
             ;;
         *)
             log_warning "Invalid choice: $choice"
@@ -1172,7 +1190,7 @@ services:
   $VITE_CONTAINER:
     container_name: $VITE_CONTAINER
     user: "\${USER_ID}:\${GROUP_ID}"
-    image: $NODE_IMAGE
+    image: $VITE_IMAGE
     volumes:
       - .:/app
     working_dir: /app
