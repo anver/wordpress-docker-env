@@ -10,7 +10,6 @@ RUN apk --update-cache add ca-certificates autoconf gcc g++ make libc-dev linux-
     /usr/local/bin/install-system-dependencies.sh && \
     /usr/local/bin/install-php-extensions.sh && \
     /usr/local/bin/install-xdebug.sh && \
-    /usr/local/bin/install-wp-cli.sh && \
     /usr/local/bin/configure-php-ini.sh && \
     /usr/local/bin/create-xdebug-log-dir.sh && \
     /usr/local/bin/create-php-log-dir.sh && \
