@@ -117,6 +117,42 @@ run_wp_cli_command() {
     fi
 }
 
+# Define an array for plugin paths
+WP_PLUGIN_PATHS=(
+    "/media/anver/work/plugins/my-plugin:/var/www/html/wp-content/plugin/my-plugin"
+    # Add more plugin paths here as needed
+)
+
+# Load plugin paths from configuration file
+if [[ -n "$WP_PLUGIN_PATHS" ]]; then
+    log_info "Loading plugin paths from configuration file..."
+    eval "WP_PLUGIN_PATHS=($WP_PLUGIN_PATHS)"
+fi
+
+# Function to generate plugin mappings for docker-compose
+get_plugin_mappings() {
+    local plugin_mappings=""
+    for plugin in "${WP_PLUGIN_PATHS[@]}"; do
+        plugin_mappings+="      - $plugin\n"
+    done
+    echo -e "$plugin_mappings"
+}
+
+# Load vite plugin paths from configuration file
+if [[ -n "$VITE_PLUGIN_PATHS" ]]; then
+    log_info "Loading vite plugin paths from configuration file..."
+    eval "VITE_PLUGIN_PATHS=($VITE_PLUGIN_PATHS)"
+fi
+
+# Function to generate vite plugin mappings for docker-compose
+get_vite_plugin_mappings() {
+    local vite_plugin_mappings=""
+    for plugin in "${VITE_PLUGIN_PATHS[@]}"; do
+        vite_plugin_mappings+="      - $plugin\n"
+    done
+    echo -e "$vite_plugin_mappings"
+}
+
 # Save configuration to file
 save_config() {
     log_info "Saving configuration to $CONFIG_FILE..."
@@ -1116,10 +1152,9 @@ services:
     image: $WP_UNIT_TESTING_IMAGE
     restart: unless-stopped
     volumes:
+$(get_plugin_mappings)
       - $DATA_DIR/site:/var/www/html
       - $CONFIG_DIR/php:/usr/local/etc/php/conf.d
-      - /media/anver/work/plugins:/var/www/html/wp-content/plugins-dev
-      - /media/anver/work/themes:/var/www/html/wp-content/themes-dev
     environment:
       WORDPRESS_DB_HOST: $DB_CONTAINER:3306
       WORDPRESS_DB_NAME: \${MYSQL_DATABASE}
@@ -1143,11 +1178,10 @@ services:
     container_name: $NGINX_CONTAINER
     restart: unless-stopped
     volumes:
+$(get_plugin_mappings)
       - $CONFIG_DIR/nginx:/etc/nginx/conf.d
       - $CONFIG_DIR/nginx/includes:/etc/nginx/my_include_files
       - $DATA_DIR/site:/var/www/html
-      - /media/anver/work/plugins:/var/www/html/wp-content/plugins-dev
-      - /media/anver/work/themes:/var/www/html/wp-content/themes-dev
     environment:
       - VIRTUAL_HOST=$DOMAIN,www.$DOMAIN
       - VIRTUAL_PORT=80
@@ -1163,9 +1197,8 @@ services:
   $WP_CLI_CONTAINER:
     container_name: $WP_CLI_CONTAINER
     image: wordpress:cli
+    restart: unless-stopped
     user: "\${USER_ID}:\${GROUP_ID}"
-    volumes:
-      - $DATA_DIR/site:/var/www/html
     environment:
       WORDPRESS_DB_HOST: $DB_CONTAINER:3306
       WORDPRESS_DB_NAME: \${MYSQL_DATABASE}
@@ -1191,8 +1224,9 @@ services:
     container_name: $VITE_CONTAINER
     user: "\${USER_ID}:\${GROUP_ID}"
     image: $VITE_IMAGE
+    restart: unless-stopped
     volumes:
-      - .:/app
+$(get_vite_plugin_mappings)
     working_dir: /app
     environment:
       VIRTUAL_HOST: "www.$VITE_DEV_SERVER,$VITE_DEV_SERVER"
@@ -1266,6 +1300,22 @@ services:
       MYSQL_DATABASE: \${MYSQL_DATABASE}
       MYSQL_USER: \${MYSQL_USER}
       MYSQL_PASSWORD: \${MYSQL_PASSWORD}
+
+  $WP_CLI_CONTAINER:
+    container_name: $WP_CLI_CONTAINER
+    image: wordpress:cli
+    restart: unless-stopped
+    user: "\${USER_ID}:\${GROUP_ID}"
+    volumes:
+      - $DATA_DIR/site:/var/www/html
+    environment:
+      WORDPRESS_DB_HOST: $DB_CONTAINER:3306
+      WORDPRESS_DB_NAME: \${MYSQL_DATABASE}
+      WORDPRESS_DB_USER: \${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: \${MYSQL_PASSWORD}
+    depends_on:
+      - $DB_CONTAINER
+    command: tail -f /dev/null
 
   $REDIS_CONTAINER:
     container_name: $REDIS_CONTAINER
