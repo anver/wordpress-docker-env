@@ -4,7 +4,8 @@ FROM node:23-alpine
 # Install necessary packages: pnpm, screen, and vim
 RUN apk add --no-cache \
   bash \
-  screen \
+  zip \
+  tmux \
   vim \
   && npm install -g pnpm
 
