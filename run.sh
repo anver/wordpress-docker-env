@@ -1194,6 +1194,8 @@ $(get_plugin_mappings)
     image: wordpress:cli
     restart: unless-stopped
     user: "\${USER_ID}:\${GROUP_ID}"
+    volumes:
+      - $DATA_DIR/site:/var/www/html
     environment:
       WORDPRESS_DB_HOST: $DB_CONTAINER:3306
       WORDPRESS_DB_NAME: \${MYSQL_DATABASE}
