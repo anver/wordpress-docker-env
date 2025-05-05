@@ -1,20 +1,20 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Listen for Xdebug",
+      "name": "Attach to Chrome",
+      "port": 9222,
+      "request": "attach",
+      "type": "chrome",
+      "webRoot": "${workspaceFolder}/plugins/boss-notification/src"
+    },
+    {
+      "name": "Xdebug",
       "type": "php",
       "request": "launch",
       "pathMappings": {
         "/var/www/html/": "${workspaceRoot}/data/site",
-        "/var/www/html/wp-content/plugins/profile/": "${workspaceRoot}/plugin",
-        "/var/www/html/wp-content/plugins/greatlife-blocks/": "${workspaceRoot}/plugins/greatlife-blocks",
-        "/var/www/html/wp-content/plugins/pcf-signup-processor/": "${workspaceRoot}/plugins/pcf-signup-processor/",
-        "/var/www/html/wp-content/plugins/": "${workspaceRoot}/data/site/wp-content/plugins/",
-        "/var/www/html/wp-content/plugins/surveyboss": "${workspaceRoot}/data/site/wp-content/plugins/surveyboss"
+        "/var/www/html/wp-content/plugins/boss-notification/": "${workspaceRoot}/plugins/boss-notification"
       },
       "port": 9003
     }

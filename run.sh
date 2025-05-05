@@ -1167,6 +1167,9 @@ $(get_plugin_mappings)
       VITE_DEV_SERVER_ADDRESS: "https://$VITE_DEV_SERVER"
     depends_on:
       - $DB_CONTAINER
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - $DOMAIN:host-gateway
 
   $NGINX_CONTAINER:
     image: $NGINX_IMAGE
@@ -1188,6 +1191,9 @@ $(get_plugin_mappings)
       interval: 10s
       timeout: 5s
       retries: 3
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - $DOMAIN:host-gateway
 
   $WP_CLI_CONTAINER:
     container_name: $WP_CLI_CONTAINER

@@ -15,8 +15,16 @@ RUN apk --update-cache add ca-certificates autoconf gcc g++ make libc-dev linux-
     /usr/local/bin/create-php-log-dir.sh && \
     /usr/local/bin/modify-www-data.sh
 
+# ADD and set Group
+RUN set eux; \
+    if [ "$(getent passwd www-data)" ]; then deluser www-data; fi; \
+    if [ "$(getent group www-data)" ]; then deluser www-data; fi; \
+    addgroup -g 1000 www-data && adduser -G www-data -g www-data -s /bin/sh -D www-data
+
 # Add health check to verify WordPress is running
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD curl -f http://localhost/wp-admin/install.php || exit 1
+
+RUN chown -R www-data:www-data /var/www/html
 
 # Set working directory
 WORKDIR /var/www/html
