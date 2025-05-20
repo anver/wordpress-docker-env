@@ -1,0 +1,20 @@
+FROM wordpress:php8.4-fpm-alpine
+
+# Copy scripts into the container
+COPY .docker/scripts/ /usr/local/bin/
+
+# Combine all script installations and user modifications into a single RUN command
+RUN apk --update-cache add ca-certificates autoconf gcc g++ make libc-dev linux-headers \
+    && apk update && apk upgrade && \
+    chmod +x /usr/local/bin/*.sh && \
+    /usr/local/bin/install-system-dependencies.sh && \
+    /usr/local/bin/install-php-extensions.sh && \
+    /usr/local/bin/configure-php-ini.sh && \
+    /usr/local/bin/create-php-log-dir.sh && \
+    /usr/local/bin/modify-www-data.sh && \
+    /usr/local/bin/install-wp-cli.sh && \
+    /usr/local/bin/install-composer.sh
+
+RUN chown -R www-data:www-data /var/www/html
+
+WORKDIR /var/www/html

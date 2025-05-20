@@ -1,5 +1,5 @@
 # Use the official Node.js 23-alpine image as the base image
-FROM node:23-alpine
+FROM node:24-alpine
 
 # Install necessary packages: pnpm, screen, and vim
 RUN apk add --no-cache \
