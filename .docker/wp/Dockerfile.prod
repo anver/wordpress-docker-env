@@ -1,7 +1,7 @@
 FROM wordpress:php8.4-fpm-alpine
 
 # Copy scripts into the container
-COPY .docker/scripts/ /usr/local/bin/
+COPY scripts/ /usr/local/bin/
 
 # Combine all script installations and user modifications into a single RUN command
 RUN apk --update-cache add ca-certificates autoconf gcc g++ make libc-dev linux-headers \

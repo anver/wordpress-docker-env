@@ -13,7 +13,7 @@ DB_IMAGE=${DB_IMAGE:-"mariadb:latest"}
 WP_IMAGE=${WP_IMAGE:-"wordpress:php8.4-fpm"}
 WP_UNIT_TESTING_IMAGE=${WP_UNIT_TESTING_IMAGE:-"wordpress:php8.4-fpm"}
 NGINX_IMAGE=${NGINX_IMAGE:-"nginx:alpine-slim"}
-NODE_IMAGE=${NODE_IMAGE:-"node:23-alpine"}
+NODE_IMAGE=${NODE_IMAGE:-"node:24-alpine"}
 REDIS_IMAGE=${REDIS_IMAGE:-"redis:alpine"}
 VITE_IMAGE=${VITE_IMAGE:-"vite-app:latest"}
 
@@ -121,9 +121,13 @@ run_wp_cli_command() {
 generate_mappings() {
     local mappings=""
     local -n array_ref=$1
-    for item in "${array_ref[@]}"; do
-        mappings+="      - $item\n"
-    done
+
+    # Check if array is empty
+    if [[ ${#array_ref[@]} -gt 0 ]]; then
+        for item in "${array_ref[@]}"; do
+            mappings+="      - $item\n"
+        done
+    fi
     echo -e "$mappings"
 }
 
@@ -993,11 +997,6 @@ expose_php = Off
 display_errors = Off
 log_errors = On
 error_log = /var/log/php/error.log
-extension=mysqli
-extension=exif
-extension=gd
-extension=intl
-extension=imagick
 
 [Date]
 date.timezone = "UTC"
@@ -1022,11 +1021,6 @@ log_errors = On
 memory_limit = 1536M
 max_execution_time = 1200
 max_input_time = 1200
-extension=mysqli
-extension=exif
-extension=gd
-extension=intl
-extension=imagick
 EOF
         ;;
 
@@ -1139,6 +1133,10 @@ EOF
         ;;
 
     "docker-dev")
+        # Get plugin mappings first to check if they exist
+        local plugin_mappings=$(get_plugin_mappings)
+        local vite_mappings=$(get_vite_plugin_mappings)
+
         cat <<EOF >docker-compose.yaml
 services:
   $WP_CONTAINER:
@@ -1146,8 +1144,7 @@ services:
     image: $WP_UNIT_TESTING_IMAGE
     restart: unless-stopped
     volumes:
-$(get_plugin_mappings)
-      - $DATA_DIR/site:/var/www/html
+${plugin_mappings}      - $DATA_DIR/site:/var/www/html
       - $CONFIG_DIR/php:/usr/local/etc/php/conf.d
     environment:
       WORDPRESS_DB_HOST: $DB_CONTAINER:3306
@@ -1175,8 +1172,7 @@ $(get_plugin_mappings)
     container_name: $NGINX_CONTAINER
     restart: unless-stopped
     volumes:
-$(get_plugin_mappings)
-      - $CONFIG_DIR/nginx:/etc/nginx/conf.d
+${plugin_mappings}      - $CONFIG_DIR/nginx:/etc/nginx/conf.d
       - $CONFIG_DIR/nginx/includes:/etc/nginx/my_include_files
       - $DATA_DIR/site:/var/www/html
     environment:
@@ -1228,8 +1224,7 @@ $(get_plugin_mappings)
     image: $VITE_IMAGE
     restart: unless-stopped
     volumes:
-$(get_vite_plugin_mappings)
-    working_dir: /app
+${vite_mappings}    working_dir: /app
     environment:
       VIRTUAL_HOST: "www.$VITE_DEV_SERVER,$VITE_DEV_SERVER"
       VIRTUAL_PORT: 3000
