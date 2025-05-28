@@ -1246,7 +1246,7 @@ generate_certs() {
 
     log_info "Generating certificates using mkcert..."
     mkdir -p "$PROXY_CERTS_DIR"
-    mkcert -cert-file "$PROXY_CERTS_DIR/$PROXY_CERT_FILE" -key-file "$PROXY_CERTS_DIR/$PROXY_KEY_FILE" "$DOMAIN" "*.$DOMAIN"
+    sh -c "mkcert -cert-file \"$PROXY_CERTS_DIR/$PROXY_CERT_FILE\" -key-file \"$PROXY_CERTS_DIR/$PROXY_KEY_FILE\" \"$DOMAIN\" \"*.$DOMAIN\""
 
     if [[ -f "$PROXY_CERTS_DIR/$PROXY_CERT_FILE" && -f "$PROXY_CERTS_DIR/$PROXY_KEY_FILE" ]]; then
         log_success "Certificates generated successfully and saved to $PROXY_CERTS_DIR."
