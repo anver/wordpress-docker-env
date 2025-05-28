@@ -3,16 +3,43 @@
 # Debugging: Log the start of the script
 echo "Starting install-php-extensions.sh script..."
 
-# Debugging: Log the PHP version
-php -v
+# Install the PHP extension installer
+echo "Downloading and installing the PHP extension installer..."
+curl -L -o /usr/local/bin/install-php-extensions https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions
+chmod +x /usr/local/bin/install-php-extensions
 
-# Install required PHP extensions
-echo "Installing PHP extensions: pdo, pdo_mysql, opcache, mysqli, exif, zip, gd"
-docker-php-ext-install pdo pdo_mysql opcache mysqli exif zip gd
+# Install PHP extensions using the installer
+echo "Installing PHP extensions..."
+install-php-extensions \
+  bz2 \
+  pcntl \
+  mbstring \
+  bcmath \
+  sockets \
+  pgsql \
+  pdo_pgsql \
+  opcache \
+  exif \
+  pdo_mysql \
+  zip \
+  uv \
+  vips \
+  intl \
+  gd \
+  memcached \
+  igbinary \
+  ldap \
+  xdebug \
+  session
 
-# Enable additional PHP extensions
-echo "Enabling PHP extensions: mysqli, exif, imagick, zip, gd"
-docker-php-ext-enable mysqli exif imagick zip gd
+# Install pnpm
+echo "Installing pnpm..."
+npm install -g pnpm
+
+# Cleanup
+echo "Cleaning up..."
+docker-php-source delete
+rm -rf /var/cache/apk/* /tmp/* /var/tmp/*
 
 # Debugging: Log the completion of the script
 echo "Completed install-php-extensions.sh script."

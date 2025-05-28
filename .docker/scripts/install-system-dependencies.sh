@@ -1,12 +1,26 @@
 #!/bin/sh
 
-# Update and install necessary system dependencies using apk (Alpine package manager)
-apk --no-cache add \
-    bash \
+# Update packages and install dependencies
+echo "Updating packages and installing dependencies..."
+apk update
+apk upgrade
+apk add --no-cache \
     curl \
+    nodejs \
+    npm \
+    wget \
+    vim \
+    tmux \
+    tzdata \
     git \
-    zip \
+    ncdu \
+    procps \
     unzip \
+    ca-certificates \
+    libsodium-dev \
+    brotli \
+    bash \
+    zip \
     libpng \
     libjpeg-turbo \
     libwebp \
@@ -18,16 +32,7 @@ apk --no-cache add \
     icu-libs \
     imagemagick \
     imagemagick-libs \
-    shadow \
-    tzdata \
-    autoconf \
-    make \
-    gcc \
-    g++ \
-    libc-dev
-
-# Clean up unnecessary build dependencies to reduce image size
-apk del --no-cache autoconf make gcc g++ libc-dev
+    shadow
 
 # Clean up
 rm -rf /var/cache/apk/*

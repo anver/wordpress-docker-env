@@ -1,2 +1,4 @@
 #!/bin/sh
-pecl install xdebug && docker-php-ext-enable xdebug
+# Install PHP extensions using the installer
+echo "Installing PHP extensions..."
+install-php-extensions xdebug
