@@ -2,6 +2,11 @@
 
 set -e # Exit on error
 
+# Script metadata
+SCRIPT_NAME="WordPress Docker Environment Manager"
+SCRIPT_VERSION="2.0.0"
+SCRIPT_AUTHOR="Enhanced with Gum"
+
 # Default configuration settings
 # Project settings
 PROJECT_NAME=${PROJECT_NAME:-"wordpress"}
@@ -13,6 +18,7 @@ DB_IMAGE=${DB_IMAGE:-"mariadb:latest"}
 WP_IMAGE=${WP_IMAGE:-"wordpress:php8.4-fpm"}
 WP_UNIT_TESTING_IMAGE=${WP_UNIT_TESTING_IMAGE:-"wordpress:php8.4-fpm"}
 NGINX_IMAGE=${NGINX_IMAGE:-"nginx:alpine-slim"}
+APACHE_WP_IMAGE=${APACHE_WP_IMAGE:-"wordpress:php8.4"}
 NODE_IMAGE=${NODE_IMAGE:-"node:24-alpine"}
 REDIS_IMAGE=${REDIS_IMAGE:-"redis:alpine"}
 VITE_IMAGE=${VITE_IMAGE:-"vite-app:latest"}
@@ -20,13 +26,13 @@ VITE_IMAGE=${VITE_IMAGE:-"vite-app:latest"}
 # Directory paths
 DATA_DIR=${DATA_DIR:-"./data"}
 CONFIG_DIR=${CONFIG_DIR:-"./config"}
-DOCKER_DIR=${DOCKER_DIR:-"./docker"}
+DOCKER_DIR=${DOCKER_DIR:-"./.docker"}
 
 # Database settings
-MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-"root_password"}
-MYSQL_DATABASE=${MYSQL_DATABASE:-"wordpress"}
-MYSQL_USER=${MYSQL_USER:-"wordpress"}
-MYSQL_PASSWORD=${MYSQL_PASSWORD:-"wordpress"}
+MYSQL_DATABASE=${MYSQL_DATABASE:-"wp"}
+MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-"password"}
+MYSQL_USER=${MYSQL_USER:-"wp"}
+MYSQL_PASSWORD=${MYSQL_PASSWORD:-"password"}
 
 # WordPress settings
 WP_TABLE_PREFIX=${WP_TABLE_PREFIX:-"wp_"}
@@ -37,8 +43,8 @@ WP_SAVEQUERIES=${WP_SAVEQUERIES:-"true"}
 WP_SCRIPT_DEBUG=${WP_SCRIPT_DEBUG:-"true"}
 
 # Docker networks
-DOCKER_DEV_NETWORK=${DOCKER_DEV_NETWORK:-"wp_network"}
-DOCKER_PROD_NETWORK=${DOCKER_PROD_NETWORK:-"traefik_network"}
+DOCKER_DEV_NETWORK=${DOCKER_DEV_NETWORK:-"proxy"}
+DOCKER_PROD_NETWORK=${DOCKER_PROD_NETWORK:-"proxy"}
 
 # Container names
 WP_CONTAINER=${WP_CONTAINER:-"wordpress"}
@@ -53,7 +59,7 @@ USER_ID=${USER_ID:-$(id -u)}
 GROUP_ID=${GROUP_ID:-$(id -g)}
 
 # Remote sync configuration
-REMOTE_SSH_HOST=${REMOTE_SSH_HOST:-"gcloud"}
+REMOTE_SSH_HOST=${REMOTE_SSH_HOST:-"remote-server"}
 REMOTE_PROJECT_PATH=${REMOTE_PROJECT_PATH:-"~/web/example.com"}
 REMOTE_DB_CONTAINER=${REMOTE_DB_CONTAINER:-"db_greatlife"}
 REMOTE_DB_USER=${REMOTE_DB_USER:-"root"}
@@ -78,42 +84,207 @@ if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE"
 fi
 
-# ANSI color codes for better visual feedback
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;36m' # Changed from light blue to cyan for better visibility
-NC='\033[0m'      # No Color
+# Enhanced styling with consistent colors
+THEME_PRIMARY="#7C3AED" # Purple - main brand
+THEME_SUCCESS="#10B981" # Green - success states
+THEME_WARNING="#F59E0B" # Amber - warnings
+THEME_ERROR="#EF4444"   # Red - errors
+THEME_INFO="#3B82F6"    # Blue - information
+THEME_MUTED="#6B7280"   # Gray - muted text
 
-# Common utility functions
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+# Enhanced logging functions with better visual feedback
+log_info() {
+    gum style --foreground="$THEME_INFO" "ℹ INFO: $1"
+}
 
-# Additional utility functions for DRY code
-prompt_with_default() {
+log_success() {
+    gum style --foreground="$THEME_SUCCESS" "✅ SUCCESS: $1"
+}
+
+log_warning() {
+    gum style --foreground="$THEME_WARNING" "⚠️  WARNING: $1"
+}
+
+log_error() {
+    gum style --foreground="$THEME_ERROR" "❌ ERROR: $1"
+}
+
+log_debug() {
+    if [[ "${DEBUG:-false}" == "true" ]]; then
+        gum style --foreground="$THEME_MUTED" "🐛 DEBUG: $1"
+    fi
+}
+
+# Enhanced section headers
+section_header() {
+    gum style \
+        --foreground="$THEME_PRIMARY" \
+        --border="double" \
+        --border-foreground="$THEME_PRIMARY" \
+        --align="center" \
+        --width=60 \
+        --margin="1 0" \
+        --padding="1 2" \
+        "$1"
+}
+
+# Enhanced utility functions leveraging Gum's power
+show_header() {
+    clear
+    section_header "$SCRIPT_NAME v$SCRIPT_VERSION"
+    gum style --foreground="$THEME_MUTED" --align="center" "Enhanced with ✨ Gum for better UX"
+    echo
+}
+
+# Enhanced input with validation and styling
+gum_input_required() {
+    local prompt="$1"
+    local placeholder="$2"
+    local value=""
+
+    while [[ -z "$value" ]]; do
+        value=$(gum input \
+            --prompt="$prompt: " \
+            --placeholder="$placeholder" \
+            --width=50)
+
+        if [[ -z "$value" ]]; then
+            log_warning "This field is required. Please enter a value."
+        fi
+    done
+
+    echo "$value"
+}
+
+gum_input_with_default() {
     local prompt="$1"
     local default="$2"
-    local result
+    local placeholder="${3:-$default}"
 
-    read -rp "$prompt [$default]: " result
+    local result
+    result=$(gum input \
+        --prompt="$prompt: " \
+        --placeholder="$placeholder" \
+        --value="$default" \
+        --width=50)
+
+    # Return default if empty
     echo "${result:-$default}"
 }
 
+# Enhanced confirmation with custom styling
+gum_confirm_styled() {
+    local prompt="$1"
+    local default="${2:-true}"
+
+    if [[ "$default" == "true" ]]; then
+        gum confirm --default=true --prompt.foreground="$THEME_PRIMARY" "$prompt"
+    else
+        gum confirm --default=false --prompt.foreground="$THEME_PRIMARY" "$prompt"
+    fi
+}
+
+# Progress indicators using Gum's spinner
+run_with_spinner() {
+    local title="$1"
+    local command="$2"
+
+    gum spin --spinner dot --title "$title" -- bash -c "$command"
+}
+
+# Enhanced menu with better styling
+gum_menu_styled() {
+    local title="$1"
+    shift
+    local options=("$@")
+
+    gum choose \
+        --header="$title" \
+        --header.foreground="$THEME_PRIMARY" \
+        --selected.foreground="$THEME_SUCCESS" \
+        --cursor.foreground="$THEME_PRIMARY" \
+        --height=15 \
+        "${options[@]}"
+}
+
+# Legacy function for backward compatibility - now uses gum
+prompt_with_default() {
+    local prompt="$1"
+    local default="$2"
+    gum_input_with_default "$prompt" "$default"
+}
+
+# Enhanced legacy menu function
+gum_menu() {
+    local title="$1"
+    shift
+    local options=("$@")
+
+    # Add Back/Exit option if not present
+    local has_exit=false
+    for opt in "${options[@]}"; do
+        if [[ "$opt" =~ (Back|Exit|Return) ]]; then
+            has_exit=true
+            break
+        fi
+    done
+
+    if [[ "$has_exit" == false ]]; then
+        options+=("🔙 Back/Exit")
+    fi
+
+    local choice
+    choice=$(gum_menu_styled "$title" "${options[@]}")
+    local exit_code=$?
+
+    # If user cancelled or selected Back/Exit
+    if [[ $exit_code -ne 0 ]] || [[ "$choice" == *"Back/Exit"* ]]; then
+        return 1
+    fi
+
+    echo "$choice"
+    return 0
+}
+
+gum_input() {
+    local prompt="$1"
+    local default="$2"
+
+    if [[ -n "$default" ]]; then
+        gum_input_with_default "$prompt" "$default"
+    else
+        gum_input_required "$prompt" "Enter value..."
+    fi
+}
+
+# Enhanced WP-CLI command runner with better error handling
 run_wp_cli_command() {
     local cmd="$1"
     local success_msg="$2"
+    local show_output="${3:-true}"
 
-    log_info "Executing: wp $cmd"
-    if docker exec ${WP_CLI_CONTAINER} wp $cmd; then
-        if [[ -n "$success_msg" ]]; then
-            log_success "$success_msg"
+    if [[ "$show_output" == "true" ]]; then
+        log_info "Executing: wp $cmd"
+        if docker exec ${WP_CLI_CONTAINER} wp $cmd; then
+            if [[ -n "$success_msg" ]]; then
+                log_success "$success_msg"
+            fi
+            return 0
+        else
+            log_error "Command failed: wp $cmd"
+            return 1
         fi
-        return 0
     else
-        log_error "Command failed: wp $cmd"
-        return 1
+        # Silent execution with spinner
+        if run_with_spinner "Executing WP-CLI command..." "docker exec ${WP_CLI_CONTAINER} wp $cmd"; then
+            if [[ -n "$success_msg" ]]; then
+                log_success "$success_msg"
+            fi
+            return 0
+        else
+            log_error "Command failed: wp $cmd"
+            return 1
+        fi
     fi
 }
 
@@ -170,6 +341,7 @@ DB_IMAGE="$DB_IMAGE"
 WP_IMAGE="$WP_IMAGE"
 WP_UNIT_TESTING_IMAGE="$WP_UNIT_TESTING_IMAGE"
 NGINX_IMAGE="$NGINX_IMAGE"
+APACHE_WP_IMAGE="$APACHE_WP_IMAGE"
 NODE_IMAGE="$NODE_IMAGE"
 REDIS_IMAGE="$REDIS_IMAGE"
 VITE_IMAGE="$VITE_IMAGE"
@@ -233,37 +405,34 @@ EOF
 
 # Configure project settings menu
 configure_project() {
-    local options=(
-        "1" "Project name: $PROJECT_NAME"
-        "2" "Domain: $DOMAIN"
-        "3" "Vite dev server: $VITE_DEV_SERVER"
-        "4" "MySQL database: $MYSQL_DATABASE"
-        "5" "MySQL user: $MYSQL_USER"
-        "6" "MySQL password: $MYSQL_PASSWORD"
-        "7" "MySQL root password: $MYSQL_ROOT_PASSWORD"
-        "8" "Docker dev network: $DOCKER_DEV_NETWORK"
-        "9" "Save configuration and return"
-    )
-
     while true; do
-        local choice
-        choice=$(whiptail --title "Project Configuration" \
-            --nocancel \
-            --menu "Select setting to modify:" 20 70 9 \
-            "${options[@]}" \
-            3>&1 1>&2 2>&3)
+        local options=(
+            "1️⃣  Project name: $PROJECT_NAME"
+            "2️⃣  Domain: $DOMAIN"
+            "3️⃣  Vite dev server: $VITE_DEV_SERVER"
+            "4️⃣  MySQL database: $MYSQL_DATABASE"
+            "5️⃣  MySQL user: $MYSQL_USER"
+            "6️⃣  MySQL password: $MYSQL_PASSWORD"
+            "7️⃣  MySQL root password: $MYSQL_ROOT_PASSWORD"
+            "8️⃣  Docker dev network: $DOCKER_DEV_NETWORK"
+            "💾  Save configuration and return"
+        )
 
-        # Exit the loop if user pressed Escape or selected nothing
-        if [[ -z "$choice" ]]; then
+        local choice
+        choice=$(gum_menu "Project Configuration" "${options[@]}")
+
+        # Exit if user selected back/exit (return code 1)
+        if [[ $? -ne 0 ]]; then
             return 0
         fi
 
-        case $choice in
-        "1")
+        case "$choice" in
+        *"Project name:"*)
             local new_project_name
-            new_project_name=$(whiptail --title "Project Name" --nocancel --inputbox "Enter project name:" 10 60 "$PROJECT_NAME" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_project_name" ]]; then
+            new_project_name=$(gum_input "Enter project name" "$PROJECT_NAME")
+            if [[ -n "$new_project_name" ]]; then
                 PROJECT_NAME="$new_project_name"
+                log_success "Project name updated to: $PROJECT_NAME"
                 # Update container names based on project name if they are default
                 if [[ "$WP_CONTAINER" == "wordpress" ]]; then
                     WP_CONTAINER="${PROJECT_NAME}_wp"
@@ -283,76 +452,72 @@ configure_project() {
                 if [[ "$VITE_CONTAINER" == "vite" ]]; then
                     VITE_CONTAINER="${PROJECT_NAME}_vite"
                 fi
-                options[1]="Project name: $PROJECT_NAME"
             fi
             ;;
-        "2")
+        *"Domain:"*)
             local new_domain
-            new_domain=$(whiptail --title "Domain" --nocancel --inputbox "Enter domain:" 10 60 "$DOMAIN" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_domain" ]]; then
+            new_domain=$(gum_input "Enter domain" "$DOMAIN")
+            if [[ -n "$new_domain" ]]; then
                 DOMAIN="$new_domain"
+                log_success "Domain updated to: $DOMAIN"
                 # Update local domain if it matches the default
                 if [[ "$LOCAL_DOMAIN" == "example.local" ]]; then
                     LOCAL_DOMAIN="$DOMAIN"
                 fi
-                options[3]="Domain: $DOMAIN"
             fi
             ;;
-        "3")
+        *"Vite dev server:"*)
             local new_vite_dev_server
-            new_vite_dev_server=$(whiptail --title "Vite Dev Server" --nocancel --inputbox "Enter Vite dev server domain:" 10 60 "$VITE_DEV_SERVER" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_vite_dev_server" ]]; then
+            new_vite_dev_server=$(gum_input "Enter Vite dev server domain" "$VITE_DEV_SERVER")
+            if [[ -n "$new_vite_dev_server" ]]; then
                 VITE_DEV_SERVER="$new_vite_dev_server"
-                options[5]="Vite dev server: $VITE_DEV_SERVER"
+                log_success "Vite dev server updated to: $VITE_DEV_SERVER"
             fi
             ;;
-        "4")
+        *"MySQL database:"*)
             local new_mysql_database
-            new_mysql_database=$(whiptail --title "MySQL Database" --nocancel --inputbox "Enter MySQL database name:" 10 60 "$MYSQL_DATABASE" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_mysql_database" ]]; then
+            new_mysql_database=$(gum_input "Enter MySQL database name" "$MYSQL_DATABASE")
+            if [[ -n "$new_mysql_database" ]]; then
                 MYSQL_DATABASE="$new_mysql_database"
-                options[7]="MySQL database: $MYSQL_DATABASE"
+                log_success "MySQL database updated to: $MYSQL_DATABASE"
             fi
             ;;
-        "5")
+        *"MySQL user:"*)
             local new_mysql_user
-            new_mysql_user=$(whiptail --title "MySQL User" --nocancel --inputbox "Enter MySQL user:" 10 60 "$MYSQL_USER" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_mysql_user" ]]; then
+            new_mysql_user=$(gum_input "Enter MySQL user" "$MYSQL_USER")
+            if [[ -n "$new_mysql_user" ]]; then
                 MYSQL_USER="$new_mysql_user"
-                options[9]="MySQL user: $MYSQL_USER"
+                log_success "MySQL user updated to: $MYSQL_USER"
             fi
             ;;
-        "6")
+        *"MySQL password:"*)
             local new_mysql_password
-            new_mysql_password=$(whiptail --title "MySQL Password" --nocancel --passwordbox "Enter MySQL password:" 10 60 "$MYSQL_PASSWORD" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_mysql_password" ]]; then
+            new_mysql_password=$(gum_input "Enter MySQL password" "$MYSQL_PASSWORD")
+            if [[ -n "$new_mysql_password" ]]; then
                 MYSQL_PASSWORD="$new_mysql_password"
-                options[11]="MySQL password: $MYSQL_PASSWORD"
+                log_success "MySQL password updated"
             fi
             ;;
-        "7")
+        *"MySQL root password:"*)
             local new_mysql_root_password
-            new_mysql_root_password=$(whiptail --title "MySQL Root Password" --nocancel --passwordbox "Enter MySQL root password:" 10 60 "$MYSQL_ROOT_PASSWORD" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_mysql_root_password" ]]; then
+            new_mysql_root_password=$(gum_input "Enter MySQL root password" "$MYSQL_ROOT_PASSWORD")
+            if [[ -n "$new_mysql_root_password" ]]; then
                 MYSQL_ROOT_PASSWORD="$new_mysql_root_password"
-                options[13]="MySQL root password: $MYSQL_ROOT_PASSWORD"
+                log_success "MySQL root password updated"
             fi
             ;;
-        "8")
+        *"Docker dev network:"*)
             local new_docker_dev_network
-            new_docker_dev_network=$(whiptail --title "Docker Dev Network" --nocancel --inputbox "Enter Docker dev network name:" 10 60 "$DOCKER_DEV_NETWORK" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_docker_dev_network" ]]; then
+            new_docker_dev_network=$(gum_input "Enter Docker dev network name" "$DOCKER_DEV_NETWORK")
+            if [[ -n "$new_docker_dev_network" ]]; then
                 DOCKER_DEV_NETWORK="$new_docker_dev_network"
-                options[15]="Docker dev network: $DOCKER_DEV_NETWORK"
+                log_success "Docker dev network updated to: $DOCKER_DEV_NETWORK"
             fi
             ;;
-        "9")
+        *"Save configuration"*)
             save_config
             log_success "Configuration saved!"
             return 0
-            ;;
-        *)
-            log_warning "Invalid choice: $choice"
             ;;
         esac
     done
@@ -360,142 +525,227 @@ configure_project() {
 
 # Configure advanced settings menu
 configure_advanced() {
-    local options=(
-        "1" "WordPress production image: $WP_IMAGE"
-        "2" "WordPress dev image: $WP_UNIT_TESTING_IMAGE"
-        "3" "DB image: $DB_IMAGE"
-        "4" "Nginx image: $NGINX_IMAGE"
-        "5" "Vite image: $VITE_IMAGE"
-        "6" "Redis image: $REDIS_IMAGE"
-        "7" "Data directory: $DATA_DIR"
-        "8" "Config directory: $CONFIG_DIR"
-        "9" "Docker directory: $DOCKER_DIR"
-        "10" "WordPress table prefix: $WP_TABLE_PREFIX"
-        "11" "WordPress debug: $WP_DEBUG"
-        "12" "Production Docker network: $DOCKER_PROD_NETWORK"
-        "13" "Save configuration and return"
-    )
-
     while true; do
-        local choice
-        choice=$(whiptail --title "Advanced Configuration" \
-            --nocancel \
-            --menu "Select setting to modify:" 20 76 13 \
-            "${options[@]}" \
-            3>&1 1>&2 2>&3)
+        local options=(
+            "🐘  WordPress production image: $WP_IMAGE"
+            "🛠️  WordPress dev image: $WP_UNIT_TESTING_IMAGE"
+            "🗄️  DB image: $DB_IMAGE"
+            "🌐  Nginx image: $NGINX_IMAGE"
+            "🔥  Apache WordPress image: $APACHE_WP_IMAGE"
+            "⚡  Vite image: $VITE_IMAGE"
+            "🚀  Redis image: $REDIS_IMAGE"
+            "📁  Data directory: $DATA_DIR"
+            "⚙️  Config directory: $CONFIG_DIR"
+            "🐳  Docker directory: $DOCKER_DIR"
+            "🏷️  WordPress table prefix: $WP_TABLE_PREFIX"
+            "🐛  WordPress debug: $WP_DEBUG"
+            "🌍  Production Docker network: $DOCKER_PROD_NETWORK"
+            "💾  Save configuration and return"
+        )
 
-        # Exit the loop if user pressed Escape or selected nothing
-        if [[ -z "$choice" ]]; then
+        local choice
+        choice=$(gum_menu "Advanced Configuration" "${options[@]}")
+
+        # Exit if user selected back/exit
+        if [[ $? -ne 0 ]]; then
             return 0
         fi
 
-        case $choice in
-        "1")
+        case "$choice" in
+        *"WordPress production image:"*)
             local new_wp_image
-            new_wp_image=$(whiptail --title "WordPress Production Image" --nocancel --inputbox "Enter WordPress production image:" 10 60 "$WP_IMAGE" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_wp_image" ]]; then
+            new_wp_image=$(gum_input "Enter WordPress production image" "$WP_IMAGE")
+            if [[ -n "$new_wp_image" ]]; then
                 WP_IMAGE="$new_wp_image"
-                options[1]="WordPress production image: $WP_IMAGE"
+                log_success "WordPress production image updated to: $WP_IMAGE"
             fi
             ;;
-        "2")
+        *"WordPress dev image:"*)
             local new_wp_unit_testing_image
-            new_wp_unit_testing_image=$(whiptail --title "WordPress Dev Image" --nocancel --inputbox "Enter WordPress dev image:" 10 60 "$WP_UNIT_TESTING_IMAGE" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_wp_unit_testing_image" ]]; then
+            new_wp_unit_testing_image=$(gum_input "Enter WordPress dev image" "$WP_UNIT_TESTING_IMAGE")
+            if [[ -n "$new_wp_unit_testing_image" ]]; then
                 WP_UNIT_TESTING_IMAGE="$new_wp_unit_testing_image"
-                options[3]="WordPress dev image: $WP_UNIT_TESTING_IMAGE"
+                log_success "WordPress dev image updated to: $WP_UNIT_TESTING_IMAGE"
             fi
             ;;
-        "3")
+        *"DB image:"*)
             local new_db_image
-            new_db_image=$(whiptail --title "DB Image" --nocancel --inputbox "Enter DB image:" 10 60 "$DB_IMAGE" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_db_image" ]]; then
+            new_db_image=$(gum_input "Enter DB image" "$DB_IMAGE")
+            if [[ -n "$new_db_image" ]]; then
                 DB_IMAGE="$new_db_image"
-                options[5]="DB image: $DB_IMAGE"
+                log_success "DB image updated to: $DB_IMAGE"
             fi
             ;;
-        "4")
+        *"Nginx image:"*)
             local new_nginx_image
-            new_nginx_image=$(whiptail --title "Nginx Image" --nocancel --inputbox "Enter Nginx image:" 10 60 "$NGINX_IMAGE" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_nginx_image" ]]; then
+            new_nginx_image=$(gum_input "Enter Nginx image" "$NGINX_IMAGE")
+            if [[ -n "$new_nginx_image" ]]; then
                 NGINX_IMAGE="$new_nginx_image"
-                options[7]="Nginx image: $NGINX_IMAGE"
+                log_success "Nginx image updated to: $NGINX_IMAGE"
             fi
             ;;
-        "5")
+        *"Apache WordPress image:"*)
+            local new_apache_wp_image
+            new_apache_wp_image=$(gum_input "Enter Apache WordPress image" "$APACHE_WP_IMAGE")
+            if [[ -n "$new_apache_wp_image" ]]; then
+                APACHE_WP_IMAGE="$new_apache_wp_image"
+                log_success "Apache WordPress image updated to: $APACHE_WP_IMAGE"
+            fi
+            ;;
+        *"Vite image:"*)
             local new_vite_image
-            new_vite_image=$(whiptail --title "Edit Vite Image" --nocancel --inputbox "Enter new Vite image version (Current: $VITE_IMAGE):" 10 60 "$VITE_IMAGE" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_vite_image" ]]; then
+            new_vite_image=$(gum_input "Enter Vite image" "$VITE_IMAGE")
+            if [[ -n "$new_vite_image" ]]; then
                 VITE_IMAGE="$new_vite_image"
                 log_success "Vite image version updated to $VITE_IMAGE"
             fi
-
-            # Update menu options to reflect the new version
-            options[9]="Vite image: $VITE_IMAGE"
             ;;
-        "6")
+        *"Redis image:"*)
             local new_redis_image
-            new_redis_image=$(whiptail --title "Redis Image" --nocancel --inputbox "Enter Redis image:" 10 60 "$REDIS_IMAGE" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_redis_image" ]]; then
+            new_redis_image=$(gum_input "Enter Redis image" "$REDIS_IMAGE")
+            if [[ -n "$new_redis_image" ]]; then
                 REDIS_IMAGE="$new_redis_image"
-                options[11]="Redis image: $REDIS_IMAGE"
+                log_success "Redis image updated to: $REDIS_IMAGE"
             fi
             ;;
-        "7")
+        *"Data directory:"*)
             local new_data_dir
-            new_data_dir=$(whiptail --title "Data Directory" --nocancel --inputbox "Enter data directory path:" 10 60 "$DATA_DIR" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_data_dir" ]]; then
+            new_data_dir=$(gum_input "Enter data directory path" "$DATA_DIR")
+            if [[ -n "$new_data_dir" ]]; then
                 DATA_DIR="$new_data_dir"
-                options[13]="Data directory: $DATA_DIR"
+                log_success "Data directory updated to: $DATA_DIR"
             fi
             ;;
-        "8")
+        *"Config directory:"*)
             local new_config_dir
-            new_config_dir=$(whiptail --title "Config Directory" --nocancel --inputbox "Enter config directory path:" 10 60 "$CONFIG_DIR" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_config_dir" ]]; then
+            new_config_dir=$(gum_input "Enter config directory path" "$CONFIG_DIR")
+            if [[ -n "$new_config_dir" ]]; then
                 CONFIG_DIR="$new_config_dir"
-                options[15]="Config directory: $CONFIG_DIR"
+                log_success "Config directory updated to: $CONFIG_DIR"
             fi
             ;;
-        "9")
+        *"Docker directory:"*)
             local new_docker_dir
-            new_docker_dir=$(whiptail --title "Docker Directory" --nocancel --inputbox "Enter docker directory path:" 10 60 "$DOCKER_DIR" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_docker_dir" ]]; then
+            new_docker_dir=$(gum_input "Enter docker directory path" "$DOCKER_DIR")
+            if [[ -n "$new_docker_dir" ]]; then
                 DOCKER_DIR="$new_docker_dir"
-                options[17]="Docker directory: $DOCKER_DIR"
+                log_success "Docker directory updated to: $DOCKER_DIR"
             fi
             ;;
-        "10")
+        *"WordPress table prefix:"*)
             local new_wp_table_prefix
-            new_wp_table_prefix=$(whiptail --title "WordPress Table Prefix" --nocancel --inputbox "Enter WordPress table prefix:" 10 60 "$WP_TABLE_PREFIX" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_wp_table_prefix" ]]; then
+            new_wp_table_prefix=$(gum_input "Enter WordPress table prefix" "$WP_TABLE_PREFIX")
+            if [[ -n "$new_wp_table_prefix" ]]; then
                 WP_TABLE_PREFIX="$new_wp_table_prefix"
-                options[19]="WordPress table prefix: $WP_TABLE_PREFIX"
+                log_success "WordPress table prefix updated to: $WP_TABLE_PREFIX"
             fi
             ;;
-        "11")
+        *"WordPress debug:"*)
+            local debug_options=("true" "false")
             local new_wp_debug
-            new_wp_debug=$(whiptail --title "WordPress Debug" --nocancel --inputbox "Enter WordPress debug (true/false):" 10 60 "$WP_DEBUG" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_wp_debug" ]]; then
+            new_wp_debug=$(gum_menu "Select WordPress debug mode" "${debug_options[@]}")
+            if [[ -n "$new_wp_debug" ]]; then
                 WP_DEBUG="$new_wp_debug"
-                options[21]="WordPress debug: $WP_DEBUG"
+                log_success "WordPress debug updated to: $WP_DEBUG"
             fi
             ;;
-        "12")
+        *"Production Docker network:"*)
             local new_docker_prod_network
-            new_docker_prod_network=$(whiptail --title "Production Docker Network" --nocancel --inputbox "Enter production Docker network:" 10 60 "$DOCKER_PROD_NETWORK" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_docker_prod_network" ]]; then
+            new_docker_prod_network=$(gum_input "Enter production Docker network" "$DOCKER_PROD_NETWORK")
+            if [[ -n "$new_docker_prod_network" ]]; then
                 DOCKER_PROD_NETWORK="$new_docker_prod_network"
-                options[23]="Production Docker network: $DOCKER_PROD_NETWORK"
+                log_success "Production Docker network updated to: $DOCKER_PROD_NETWORK"
             fi
             ;;
-        "13")
+        *"Save configuration"*)
             save_config
             log_success "Configuration saved!"
             return 0
             ;;
-        *)
-            log_warning "Invalid choice: $choice"
+        esac
+    done
+}
+
+# Configure remote server settings menu
+configure_remote_server() {
+    while true; do
+        # Display SSH config info
+        echo
+        gum style --foreground="$THEME_INFO" "ℹ INFO: SSH connection details are read from ~/.ssh/config"
+        gum style --foreground="$THEME_MUTED" "Configure your SSH host alias, user, and keys in ~/.ssh/config"
+        echo
+
+        local options=(
+            "🌐  SSH Host alias: $REMOTE_SSH_HOST"
+            "📁  Remote project path: $REMOTE_PROJECT_PATH"
+            "🗄️  Remote DB container: $REMOTE_DB_CONTAINER"
+            "👤  Remote DB user: $REMOTE_DB_USER"
+            "🔑  Remote DB password: $REMOTE_DB_PASSWORD"
+            "🗃️  Remote DB name: $REMOTE_DB_NAME"
+            "💾  Save configuration and return"
+        )
+
+        local choice
+        choice=$(gum_menu "Remote Server Configuration" "${options[@]}")
+
+        # Exit if user selected back/exit
+        if [[ $? -ne 0 ]]; then
+            return 0
+        fi
+
+        case "$choice" in
+        *"SSH Host:"*)
+            local new_ssh_host
+            new_ssh_host=$(gum_input "Enter remote SSH host (IP or hostname)" "$REMOTE_SSH_HOST")
+            if [[ -n "$new_ssh_host" ]]; then
+                REMOTE_SSH_HOST="$new_ssh_host"
+                log_success "Remote SSH host updated to: $REMOTE_SSH_HOST"
+            fi
+            ;;
+        *"Remote project path:"*)
+            local new_project_path
+            new_project_path=$(gum_input "Enter remote project path" "$REMOTE_PROJECT_PATH")
+            if [[ -n "$new_project_path" ]]; then
+                REMOTE_PROJECT_PATH="$new_project_path"
+                log_success "Remote project path updated to: $REMOTE_PROJECT_PATH"
+            fi
+            ;;
+        *"Remote DB container:"*)
+            local new_db_container
+            new_db_container=$(gum_input "Enter remote database container name" "$REMOTE_DB_CONTAINER")
+            if [[ -n "$new_db_container" ]]; then
+                REMOTE_DB_CONTAINER="$new_db_container"
+                log_success "Remote DB container updated to: $REMOTE_DB_CONTAINER"
+            fi
+            ;;
+        *"Remote DB user:"*)
+            local new_db_user
+            new_db_user=$(gum_input "Enter remote database user" "$REMOTE_DB_USER")
+            if [[ -n "$new_db_user" ]]; then
+                REMOTE_DB_USER="$new_db_user"
+                log_success "Remote DB user updated to: $REMOTE_DB_USER"
+            fi
+            ;;
+        *"Remote DB password:"*)
+            local new_db_password
+            new_db_password=$(gum_input "Enter remote database password" "$REMOTE_DB_PASSWORD")
+            if [[ -n "$new_db_password" ]]; then
+                REMOTE_DB_PASSWORD="$new_db_password"
+                log_success "Remote DB password updated"
+            fi
+            ;;
+        *"Remote DB name:"*)
+            local new_db_name
+            new_db_name=$(gum_input "Enter remote database name" "$REMOTE_DB_NAME")
+            if [[ -n "$new_db_name" ]]; then
+                REMOTE_DB_NAME="$new_db_name"
+                log_success "Remote DB name updated to: $REMOTE_DB_NAME"
+            fi
+            ;;
+        *"Save configuration"*)
+            save_config
+            log_success "Configuration saved!"
+            return 0
             ;;
         esac
     done
@@ -503,52 +753,45 @@ configure_advanced() {
 
 # Manage hosts file submenu
 manage_hosts_file() {
-    local options=(
-        "1" "Add domain to hosts file"
-        "2" "Remove domain from hosts file"
-        "3" "Check if domain exists in hosts file"
-        "4" "Back to main menu"
-    )
-
     while true; do
-        local choice
-        choice=$(whiptail --title "Manage Hosts File Menu" \
-            --nocancel \
-            --menu "Select an option:" 15 60 4 \
-            "${options[@]}" \
-            3>&1 1>&2 2>&3)
+        local options=(
+            "➕  Add domain to hosts file"
+            "➖  Remove domain from hosts file"
+            "🔍  Check if domain exists in hosts file"
+            "🔙  Back to main menu"
+        )
 
-        # Exit the loop if user pressed Escape or selected nothing
-        if [[ -z "$choice" || "$choice" == "4" ]]; then
+        local choice
+        choice=$(gum_menu "Manage Hosts File" "${options[@]}")
+
+        # Exit if no selection or user pressed Esc
+        if [[ -z "$choice" || "$choice" == *"Back to main menu"* ]]; then
             return 0
         fi
 
-        case $choice in
-        "1")
+        case "$choice" in
+        *"Add domain"*)
             if grep -q "$DOMAIN" /etc/hosts; then
-                whiptail --title "Warning" --msgbox "Domain $DOMAIN already exists in the hosts file." 10 60
+                log_warning "Domain $DOMAIN already exists in the hosts file."
             else
                 echo "127.0.0.1 $DOMAIN" | sudo tee -a /etc/hosts >/dev/null
-                whiptail --title "Success" --msgbox "Domain $DOMAIN added to hosts file." 10 60
+                log_success "Domain $DOMAIN added to hosts file."
             fi
             ;;
-        "2")
+        *"Remove domain"*)
             if grep -q "$DOMAIN" /etc/hosts; then
                 sudo sed -i "/$DOMAIN/d" /etc/hosts
-                whiptail --title "Success" --msgbox "Domain $DOMAIN removed from hosts file." 10 60
+                log_success "Domain $DOMAIN removed from hosts file."
             else
-                whiptail --title "Warning" --msgbox "Domain $DOMAIN not found in the hosts file." 10 60
+                log_warning "Domain $DOMAIN not found in the hosts file."
             fi
             ;;
-        "3")
+        *"Check if domain"*)
             if grep -q "$DOMAIN" /etc/hosts; then
-                whiptail --title "Status" --msgbox "Domain $DOMAIN exists in the hosts file." 10 60
+                log_info "Domain $DOMAIN exists in the hosts file."
             else
-                whiptail --title "Status" --msgbox "Domain $DOMAIN does not exist in the hosts file." 10 60
+                log_info "Domain $DOMAIN does not exist in the hosts file."
             fi
-            ;;
-        *)
-            log_warning "Invalid choice: $choice"
             ;;
         esac
     done
@@ -556,31 +799,27 @@ manage_hosts_file() {
 
 # Manage proxy container submenu
 manage_proxy_container() {
-    local options=(
-        "1" "Run main proxy container"
-        "2" "Stop and remove proxy container"
-        "3" "Check proxy container status"
-        "4" "Back to main menu"
-    )
-
     while true; do
-        local choice
-        choice=$(whiptail --title "Manage Proxy Container" \
-            --nocancel \
-            --menu "Select an option:" 15 60 4 \
-            "${options[@]}" \
-            3>&1 1>&2 2>&3)
+        local options=(
+            "🚀  Run main proxy container"
+            "🛑  Stop and remove proxy container"
+            "📊  Check proxy container status"
+            "🔙  Back to main menu"
+        )
 
-        # Exit the loop if user pressed Escape or selected nothing
-        if [[ -z "$choice" || "$choice" == "4" ]]; then
+        local choice
+        choice=$(gum_menu "Manage Proxy Container" "${options[@]}")
+
+        # Exit if no selection or user pressed Esc
+        if [[ -z "$choice" || "$choice" == *"Back to main menu"* ]]; then
             return 0
         fi
 
-        case $choice in
-        "1")
+        case "$choice" in
+        *"Run main proxy container"*)
             # Check if ports 80 and 443 are free
             if lsof -i:80 -i:443 &>/dev/null; then
-                whiptail --title "Error" --msgbox "Ports 80 and/or 443 are already in use. Please stop any services using these ports and try again." 10 70
+                log_error "Ports 80 and/or 443 are already in use. Please stop any services using these ports and try again."
                 continue
             fi
 
@@ -593,12 +832,12 @@ manage_proxy_container() {
 
             # Check if container already exists
             if docker ps --format '{{.Names}}' | grep -q "^$PROXY_CONTAINER_NAME\$"; then
-                whiptail --title "Information" --msgbox "Proxy container $PROXY_CONTAINER_NAME is already running." 10 60
+                log_info "Proxy container $PROXY_CONTAINER_NAME is already running."
                 continue
             elif docker ps -a --format '{{.Names}}' | grep -q "^$PROXY_CONTAINER_NAME\$"; then
                 log_info "Container exists but is not running. Starting container..."
                 docker start "$PROXY_CONTAINER_NAME"
-                whiptail --title "Success" --msgbox "Proxy container $PROXY_CONTAINER_NAME started." 10 60
+                log_success "Proxy container $PROXY_CONTAINER_NAME started."
                 continue
             fi
 
@@ -610,24 +849,24 @@ manage_proxy_container() {
                 -v "$PROXY_CERTS_DIR:/etc/nginx/certs" \
                 "$PROXY_IMAGE"
 
-            whiptail --title "Success" --msgbox "Proxy container $PROXY_CONTAINER_NAME is now running." 10 60
+            log_success "Proxy container $PROXY_CONTAINER_NAME is now running."
             ;;
-        "2")
+        *"Stop and remove proxy container"*)
             # Stop and remove the proxy container
             if docker ps -a --format '{{.Names}}' | grep -q "^$PROXY_CONTAINER_NAME\$"; then
                 log_info "Stopping and removing the proxy container..."
                 docker stop "$PROXY_CONTAINER_NAME" && docker rm "$PROXY_CONTAINER_NAME"
-                whiptail --title "Success" --msgbox "Proxy container $PROXY_CONTAINER_NAME stopped and removed." 10 70
+                log_success "Proxy container $PROXY_CONTAINER_NAME stopped and removed."
             else
-                whiptail --title "Warning" --msgbox "Proxy container $PROXY_CONTAINER_NAME is not running." 10 60
+                log_warning "Proxy container $PROXY_CONTAINER_NAME is not running."
             fi
             ;;
-        "3")
+        *"Check proxy container status"*)
             # Check the status of the proxy container
             if docker ps --format '{{.Names}}' | grep -q "^$PROXY_CONTAINER_NAME\$"; then
-                whiptail --title "Status" --msgbox "Proxy container $PROXY_CONTAINER_NAME is running." 10 60
+                log_success "Proxy container $PROXY_CONTAINER_NAME is running."
             else
-                whiptail --title "Status" --msgbox "Proxy container $PROXY_CONTAINER_NAME is not running." 10 60
+                log_info "Proxy container $PROXY_CONTAINER_NAME is not running."
             fi
             ;;
         *)
@@ -639,55 +878,55 @@ manage_proxy_container() {
 
 # Docker management submenu
 configure_docker_menu() {
-    local options=(
-        "1" "Build and start containers"
-        "2" "Stop containers"
-        "3" "Start containers"
-        "4" "Restart containers"
-        "5" "Remove containers"
-        "6" "View logs"
-        "7" "Access container shell"
-        "8" "Back to main menu"
-    )
-
     while true; do
-        local choice
-        choice=$(whiptail --title "Docker Management Menu" \
-            --nocancel \
-            --menu "Select an operation:" 17 60 8 \
-            "${options[@]}" \
-            3>&1 1>&2 2>&3)
+        local options=(
+            "🔨  Build and start containers"
+            "⏹️  Stop containers"
+            "▶️  Start containers"
+            "🔄  Restart containers"
+            "🗑️  Remove containers"
+            "📋  View logs"
+            "🐚  Access container shell"
+            "🔙  Back to main menu"
+        )
 
-        # Exit the loop if user pressed Escape or selected nothing
-        if [[ -z "$choice" || "$choice" == "8" ]]; then
+        local choice
+        choice=$(gum_menu "Docker Management Menu" "${options[@]}")
+
+        # Exit if no selection or user pressed Esc
+        if [[ -z "$choice" || "$choice" == *"Back to main menu"* ]]; then
             return 0
         fi
 
-        case $choice in
-        "1")
+        case "$choice" in
+        *"Build and start containers"*)
             handleDocker "build"
             ;;
-        "2")
+        *"Stop containers"*)
             handleDocker "stop"
             ;;
-        "3")
+        *"Start containers"*)
             handleDocker "start"
             ;;
-        "4")
+        *"Restart containers"*)
             handleDocker "restart"
             ;;
-        "5")
+        *"Remove containers"*)
             handleDocker "remove"
             ;;
-        "6")
+        *"View logs"*)
             local container
-            container=$(whiptail --title "View Logs" --nocancel --inputbox "Enter container name (wp, db, nginx, redis, vite):" 10 60 "" 3>&1 1>&2 2>&3)
-            handleDocker "logs" "$container"
+            container=$(gum_input "Enter container name (wp, db, nginx, redis, vite)" "")
+            if [[ -n "$container" ]]; then
+                handleDocker "logs" "$container"
+            fi
             ;;
-        "7")
+        *"Access container shell"*)
             local container
-            container=$(whiptail --title "Access Container Shell" --nocancel --inputbox "Enter container name (wp, db, nginx, redis, vite, wpcli):" 10 60 "" 3>&1 1>&2 2>&3)
-            handleDocker "shell" "$container"
+            container=$(gum_input "Enter container name (wp, db, nginx, redis, vite, wpcli)" "")
+            if [[ -n "$container" ]]; then
+                handleDocker "shell" "$container"
+            fi
             ;;
         *)
             log_warning "Invalid choice: $choice"
@@ -698,70 +937,76 @@ configure_docker_menu() {
 
 # WP-CLI submenu
 configure_wpcli_menu() {
-    local options=(
-        "1" "Install WordPress"
-        "2" "Create user"
-        "3" "Install plugin"
-        "4" "Install theme"
-        "5" "Enable debugging"
-        "6" "Disable debugging"
-        "7" "Run custom WP-CLI command"
-        "8" "Back to main menu"
-    )
-
     while true; do
-        local choice
-        choice=$(whiptail --title "WP-CLI Management Menu" \
-            --nocancel \
-            --menu "Select an operation:" 17 60 8 \
-            "${options[@]}" \
-            3>&1 1>&2 2>&3)
+        local options=(
+            "🚀  Install WordPress"
+            "👤  Create user"
+            "🔌  Install plugin"
+            "🎨  Install theme"
+            "🐛  Enable debugging"
+            "🔇  Disable debugging"
+            "⚙️  Run custom WP-CLI command"
+            "🔙  Back to main menu"
+        )
 
-        # Exit the loop if user pressed Escape or selected nothing
-        if [[ -z "$choice" || "$choice" == "8" ]]; then
+        local choice
+        choice=$(gum_menu "WP-CLI Management Menu" "${options[@]}")
+
+        # Exit if no selection or user pressed Esc
+        if [[ -z "$choice" || "$choice" == *"Back to main menu"* ]]; then
             return 0
         fi
 
-        case $choice in
-        "1")
+        case "$choice" in
+        *"Install WordPress"*)
             handleWpCli "install"
             ;;
-        "2")
+        *"Create user"*)
             local username email role password
 
-            username=$(whiptail --title "Username" --nocancel --inputbox "Enter username:" 10 60 "" 3>&1 1>&2 2>&3)
-            email=$(whiptail --title "Email" --nocancel --inputbox "Enter email:" 10 60 "" 3>&1 1>&2 2>&3)
-            role=$(whiptail --title "Role" --nocancel --inputbox "Enter role:" 10 60 "subscriber" 3>&1 1>&2 2>&3)
-            password=$(whiptail --title "Password" --nocancel --passwordbox "Enter password:" 10 60 "password" 3>&1 1>&2 2>&3)
+            username=$(gum_input "Enter username" "")
+            if [[ -z "$username" ]]; then continue; fi
+
+            email=$(gum_input "Enter email" "")
+            if [[ -z "$email" ]]; then continue; fi
+
+            role=$(gum_input "Enter role" "subscriber")
+            if [[ -z "$role" ]]; then role="subscriber"; fi
+
+            # For password, we'll use read with hidden input since gum doesn't support password fields
+            echo -n "Enter password: "
+            read -s password
+            echo
+            if [[ -z "$password" ]]; then password="password"; fi
 
             handleWpCli "create-user" "$username" "$email" "$role" "$password"
             ;;
-        "3")
+        *"Install plugin"*)
             local plugin
-
-            plugin=$(whiptail --title "Plugin" --nocancel --inputbox "Enter plugin name:" 10 60 "" 3>&1 1>&2 2>&3)
-
-            handleWpCli "install-plugin" "$plugin"
+            plugin=$(gum_input "Enter plugin name" "")
+            if [[ -n "$plugin" ]]; then
+                handleWpCli "install-plugin" "$plugin"
+            fi
             ;;
-        "4")
+        *"Install theme"*)
             local theme
-
-            theme=$(whiptail --title "Theme" --nocancel --inputbox "Enter theme name:" 10 60 "" 3>&1 1>&2 2>&3)
-
-            handleWpCli "install-theme" "$theme"
+            theme=$(gum_input "Enter theme name" "")
+            if [[ -n "$theme" ]]; then
+                handleWpCli "install-theme" "$theme"
+            fi
             ;;
-        "5")
+        *"Enable debugging"*)
             handleWpCli "debug-on"
             ;;
-        "6")
+        *"Disable debugging"*)
             handleWpCli "debug-off"
             ;;
-        "7")
+        *"Run custom WP-CLI command"*)
             local custom_cmd
-
-            custom_cmd=$(whiptail --title "Custom Command" --nocancel --inputbox "Enter custom WP-CLI command:" 10 60 "" 3>&1 1>&2 2>&3)
-
-            handleWpCli "custom" "$custom_cmd"
+            custom_cmd=$(gum_input "Enter custom WP-CLI command" "")
+            if [[ -n "$custom_cmd" ]]; then
+                handleWpCli "custom" "$custom_cmd"
+            fi
             ;;
         *)
             log_warning "Invalid choice: $choice"
@@ -772,67 +1017,59 @@ configure_wpcli_menu() {
 
 # Manage Docker images submenu
 manage_docker_images_menu() {
-    local options=(
-        "1" "Build development image (Current: $WP_UNIT_TESTING_IMAGE)"
-        "2" "Build production image (Current: $WP_IMAGE)"
-        "3" "Build Vite image (Current: $VITE_IMAGE)"
-        "4" "Edit image versions"
-        "5" "Back to main menu"
-    )
-
     while true; do
-        local choice
-        choice=$(whiptail --title "Manage Docker Images" \
-            --nocancel \
-            --menu "Select an option:" 15 60 5 \
-            "${options[@]}" \
-            3>&1 1>&2 2>&3)
+        local options=(
+            "🔨  Build development image (Current: $WP_UNIT_TESTING_IMAGE)"
+            "🏭  Build production image (Current: $WP_IMAGE)"
+            "⚡  Build Vite image (Current: $VITE_IMAGE)"
+            "✏️  Edit image versions"
+            "🔙  Back to main menu"
+        )
 
-        if [[ -z "$choice" || "$choice" == "5" ]]; then
+        local choice
+        choice=$(gum_menu "Manage Docker Images" "${options[@]}")
+
+        # Exit if no selection or user pressed Esc
+        if [[ -z "$choice" || "$choice" == *"Back to main menu"* ]]; then
             return 0
         fi
 
-        case $choice in
-        "1")
+        case "$choice" in
+        *"Build development image"*)
             log_info "Building development image: $WP_UNIT_TESTING_IMAGE..."
             docker build -f docker/wp/Dockerfile.dev -t $WP_UNIT_TESTING_IMAGE .
             log_success "Development image built successfully!"
             ;;
-        "2")
+        *"Build production image"*)
             log_info "Building production image: $WP_IMAGE..."
             docker build -f docker/wp/Dockerfile.prod -t $WP_IMAGE .
             log_success "Production image built successfully!"
             ;;
-        "3")
+        *"Build Vite image"*)
             log_info "Building Vite image: $VITE_IMAGE..."
             docker build -f docker/vite/Dockerfile.prod -t $VITE_IMAGE .
             log_success "Vite image built and tagged as $VITE_IMAGE!"
             ;;
-        "4")
+        *"Edit image versions"*)
             local new_dev_image new_prod_image new_vite_image
 
-            new_dev_image=$(whiptail --title "Edit Development Image" --nocancel --inputbox "Enter new development image version (Current: $WP_UNIT_TESTING_IMAGE):" 10 60 "$WP_UNIT_TESTING_IMAGE" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_dev_image" ]]; then
+            new_dev_image=$(gum_input "Enter new development image version (Current: $WP_UNIT_TESTING_IMAGE)" "$WP_UNIT_TESTING_IMAGE")
+            if [[ -n "$new_dev_image" ]]; then
                 WP_UNIT_TESTING_IMAGE="$new_dev_image"
                 log_success "Development image version updated to $WP_UNIT_TESTING_IMAGE"
             fi
 
-            new_prod_image=$(whiptail --title "Edit Production Image" --nocancel --inputbox "Enter new production image version (Current: $WP_IMAGE):" 10 60 "$WP_IMAGE" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_prod_image" ]]; then
+            new_prod_image=$(gum_input "Enter new production image version (Current: $WP_IMAGE)" "$WP_IMAGE")
+            if [[ -n "$new_prod_image" ]]; then
                 WP_IMAGE="$new_prod_image"
                 log_success "Production image version updated to $WP_IMAGE"
             fi
 
-            new_vite_image=$(whiptail --title "Edit Vite Image" --nocancel --inputbox "Enter new Vite image version (Current: $VITE_IMAGE):" 10 60 "$VITE_IMAGE" 3>&1 1>&2 2>&3)
-            if [[ $? -eq 0 && -n "$new_vite_image" ]]; then
+            new_vite_image=$(gum_input "Enter new Vite image version (Current: $VITE_IMAGE)" "$VITE_IMAGE")
+            if [[ -n "$new_vite_image" ]]; then
                 VITE_IMAGE="$new_vite_image"
                 log_success "Vite image version updated to $VITE_IMAGE"
             fi
-
-            # Update menu options to reflect new versions
-            options[1]="1 Build development image (Current: $WP_UNIT_TESTING_IMAGE)"
-            options[3]="2 Build production image (Current: $WP_IMAGE)"
-            options[5]="3 Build Vite image (Current: $VITE_IMAGE)"
             ;;
         *)
             log_warning "Invalid choice: $choice"
@@ -841,30 +1078,140 @@ manage_docker_images_menu() {
     done
 }
 
-# Check for required commands
+# Enhanced requirements check with visual feedback and version info
 check_requirements() {
-    log_info "Checking requirements..."
+    section_header "🔍 System Requirements Check"
 
-    local required_cmds=("docker" "curl")
-    local missing_cmds=()
+    # Define required tools with their minimum versions
+    declare -A required_tools=(
+        ["docker"]="20.10.0"
+        ["curl"]="7.0.0"
+        ["gum"]="0.8.0"
+    )
 
-    for cmd in "${required_cmds[@]}"; do
-        if ! command -v "$cmd" &>/dev/null; then
-            missing_cmds+=("$cmd")
+    local all_good=true
+    local check_results=()
+
+    # Check each required tool
+    for tool in "${!required_tools[@]}"; do
+        local min_version="${required_tools[$tool]}"
+
+        if command -v "$tool" &>/dev/null; then
+            local current_version=""
+            case "$tool" in
+            "docker")
+                current_version=$(docker --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1)
+                ;;
+            "curl")
+                current_version=$(curl --version 2>/dev/null | head -1 | grep -oP '\d+\.\d+\.\d+' | head -1)
+                ;;
+            "gum")
+                current_version=$(gum --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1)
+                ;;
+            esac
+
+            if [[ -n "$current_version" ]]; then
+                check_results+=("✅ $tool: $current_version (min: $min_version)")
+            else
+                check_results+=("✅ $tool: installed (version check failed)")
+            fi
+        else
+            check_results+=("❌ $tool: NOT FOUND (required: $min_version)")
+            all_good=false
         fi
     done
 
-    if ! docker compose --version &>/dev/null; then
-        missing_cmds+=("docker compose")
+    # Check Docker Compose separately
+    if docker compose version &>/dev/null; then
+        local compose_version=$(docker compose version --short 2>/dev/null || echo "unknown")
+        check_results+=("✅ docker compose: $compose_version")
+    else
+        check_results+=("❌ docker compose: NOT FOUND")
+        all_good=false
     fi
 
-    if [ ${#missing_cmds[@]} -gt 0 ]; then
-        log_error "Missing required commands: ${missing_cmds[*]}"
-        log_info "Please install them before continuing."
-        exit 1
+    # Check optional but recommended tools
+    local optional_tools=("mkcert" "git")
+    for tool in "${optional_tools[@]}"; do
+        if command -v "$tool" &>/dev/null; then
+            case "$tool" in
+            "mkcert")
+                local version=$(mkcert -version 2>/dev/null | grep -oP 'v\d+\.\d+\.\d+' | head -1 || echo "unknown")
+                check_results+=("🔧 $tool: $version (optional - for SSL certificates)")
+                ;;
+            "git")
+                local version=$(git --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1 || echo "unknown")
+                check_results+=("🔧 git: $version (optional - for version control)")
+                ;;
+            esac
+        else
+            check_results+=("⚠️  $tool: not found (optional)")
+        fi
+    done
+
+    # Display results with proper formatting
+    echo
+    gum style --foreground="$THEME_INFO" --bold "System Check Results:"
+    echo
+
+    for result in "${check_results[@]}"; do
+        echo "  $result"
+    done
+
+    echo
+
+    # Show system information
+    gum style --foreground="$THEME_MUTED" "System Information:"
+    echo "  🖥️  OS: $(uname -s)"
+    echo "  🏗️  Architecture: $(uname -m)"
+    echo "  👤 User: $(whoami) (UID: $(id -u), GID: $(id -g))"
+
+    # Check if running as root (which we don't want)
+    if [[ $EUID -eq 0 ]]; then
+        echo
+        log_error "Script is running as root! This is not recommended for security reasons."
+        gum_confirm_styled "Continue anyway?" false || exit 1
     fi
 
-    log_success "All requirements satisfied!"
+    echo
+
+    if [[ "$all_good" == true ]]; then
+        log_success "All required tools are available! 🎉"
+
+        # Check Docker daemon
+        if ! docker info &>/dev/null; then
+            log_warning "Docker daemon is not running. Please start Docker and try again."
+            return 1
+        else
+            log_success "Docker daemon is running properly."
+        fi
+
+        # Check available disk space
+        local available_space=$(df . | awk 'NR==2 {print $4}')
+        local space_gb=$((available_space / 1024 / 1024))
+
+        if [[ $space_gb -lt 2 ]]; then
+            log_warning "Low disk space: ${space_gb}GB available. WordPress environment needs at least 2GB."
+        else
+            log_success "Sufficient disk space: ${space_gb}GB available."
+        fi
+
+    else
+        echo
+        log_error "Some required tools are missing!"
+        echo
+        gum style --foreground="$THEME_WARNING" "📋 Installation Instructions:"
+        echo
+        echo "  Docker: https://docs.docker.com/get-docker/"
+        echo "  Gum: https://github.com/charmbracelet/gum#installation"
+        echo "  curl: Usually pre-installed, or via package manager"
+        echo "  mkcert (optional): https://github.com/FiloSottile/mkcert#installation"
+        echo
+
+        if ! gum_confirm_styled "Continue anyway? (some features may not work)" false; then
+            exit 1
+        fi
+    fi
 }
 
 # Create necessary directories
@@ -890,7 +1237,7 @@ generate_certs() {
 
     # Prompt user to set proxy certs directory
     local new_proxy_certs_dir
-    new_proxy_certs_dir=$(whiptail --title "Set Proxy Certs Directory" --nocancel --inputbox "Enter the directory to save proxy certificates:" 10 60 "$default_proxy_certs_dir" 3>&1 1>&2 2>&3)
+    new_proxy_certs_dir=$(gum_input "Enter the directory to save proxy certificates" "$default_proxy_certs_dir")
     if [[ -n "$new_proxy_certs_dir" ]]; then
         PROXY_CERTS_DIR="$new_proxy_certs_dir"
     else
@@ -923,6 +1270,7 @@ DOMAIN=$DOMAIN
 VITE_DEV_SERVER=$VITE_DEV_SERVER
 DB_IMAGE=$DB_IMAGE
 WP_UNIT_TESTING_IMAGE=$WP_UNIT_TESTING_IMAGE
+APACHE_WP_IMAGE=$APACHE_WP_IMAGE
 DATA_DIR=$DATA_DIR
 CONFIG_DIR=$CONFIG_DIR
 DOCKER_DIR=$DOCKER_DIR
@@ -1137,7 +1485,7 @@ EOF
         local plugin_mappings=$(get_plugin_mappings)
         local vite_mappings=$(get_vite_plugin_mappings)
 
-        cat <<EOF >docker-compose.yaml
+        cat <<EOF >docker-compose.dev.yaml
 services:
   $WP_CONTAINER:
     container_name: $WP_CONTAINER
@@ -1189,22 +1537,6 @@ ${plugin_mappings}      - $CONFIG_DIR/nginx:/etc/nginx/conf.d
     extra_hosts:
       - host.docker.internal:host-gateway
       - $DOMAIN:host-gateway
-
-  $WP_CLI_CONTAINER:
-    container_name: $WP_CLI_CONTAINER
-    image: wordpress:cli
-    restart: unless-stopped
-    user: "\${USER_ID}:\${GROUP_ID}"
-    volumes:
-      - $DATA_DIR/site:/var/www/html
-    environment:
-      WORDPRESS_DB_HOST: $DB_CONTAINER:3306
-      WORDPRESS_DB_NAME: \${MYSQL_DATABASE}
-      WORDPRESS_DB_USER: \${MYSQL_USER}
-      WORDPRESS_DB_PASSWORD: \${MYSQL_PASSWORD}
-    depends_on:
-      - $DB_CONTAINER
-    command: tail -f /dev/null
 
   $DB_CONTAINER:
     container_name: $DB_CONTAINER
@@ -1336,6 +1668,190 @@ networks:
 EOF
         ;;
 
+    "docker-apache-dev")
+        # Get plugin mappings first to check if they exist
+        local plugin_mappings=$(get_plugin_mappings)
+        local vite_mappings=$(get_vite_plugin_mappings)
+
+        cat <<EOF >docker-compose-apache.dev.yaml
+services:
+  $WP_CONTAINER:
+    container_name: $WP_CONTAINER
+    image: $APACHE_WP_IMAGE
+    restart: unless-stopped
+    volumes:
+${plugin_mappings}      - $DATA_DIR/site:/var/www/html
+      - $CONFIG_DIR/php:/usr/local/etc/php/conf.d
+    environment:
+      WORDPRESS_DB_HOST: $DB_CONTAINER:3306
+      WORDPRESS_DB_NAME: \${MYSQL_DATABASE}
+      WORDPRESS_DB_USER: \${MYSQL_USER}
+      MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
+      WORDPRESS_DB_PASSWORD: \${MYSQL_PASSWORD}
+      WORDPRESS_DEBUG: $WP_DEBUG
+      WORDPRESS_TABLE_PREFIX: $WP_TABLE_PREFIX
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+        define('WP_ENVIRONMENT_TYPE', 'development');
+        define('WP_CACHE', false);
+      WORDPRESS_REDIS_HOST: $REDIS_CONTAINER
+      DOMAIN_CURRENT_SITE: $DOMAIN
+      VITE_DEV_SERVER_ADDRESS: "https://$VITE_DEV_SERVER"
+      VIRTUAL_HOST: $DOMAIN,www.$DOMAIN
+      VIRTUAL_PORT: 80
+      VIRTUAL_PROTO: http
+    depends_on:
+      - $DB_CONTAINER
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - $DOMAIN:host-gateway
+
+  $DB_CONTAINER:
+    container_name: $DB_CONTAINER
+    image: $DB_IMAGE
+    restart: unless-stopped
+    volumes:
+      - $DATA_DIR/mysql:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: \${MYSQL_DATABASE}
+      MYSQL_USER: \${MYSQL_USER}
+      MYSQL_PASSWORD: \${MYSQL_PASSWORD}
+
+  $WP_CLI_CONTAINER:
+    container_name: $WP_CLI_CONTAINER
+    image: wordpress:cli
+    restart: unless-stopped
+    user: "\${USER_ID}:\${GROUP_ID}"
+    volumes:
+      - $DATA_DIR/site:/var/www/html
+    environment:
+      WORDPRESS_DB_HOST: $DB_CONTAINER:3306
+      WORDPRESS_DB_NAME: \${MYSQL_DATABASE}
+      WORDPRESS_DB_USER: \${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: \${MYSQL_PASSWORD}
+    depends_on:
+      - $DB_CONTAINER
+    command: tail -f /dev/null
+
+  $VITE_CONTAINER:
+    container_name: $VITE_CONTAINER
+    user: "\${USER_ID}:\${GROUP_ID}"
+    image: $VITE_IMAGE
+    restart: unless-stopped
+    volumes:
+${vite_mappings}    working_dir: /app
+    environment:
+      VIRTUAL_HOST: "www.$VITE_DEV_SERVER,$VITE_DEV_SERVER"
+      VIRTUAL_PORT: 3000
+      VIRTUAL_PROTO: http
+      VITE_DEV_SERVER_ADDRESS: "https://$VITE_DEV_SERVER"
+    command: tail -f /dev/null
+
+  $REDIS_CONTAINER:
+    container_name: $REDIS_CONTAINER
+    image: $REDIS_IMAGE
+    restart: unless-stopped
+    volumes:
+      - $DATA_DIR/redis:/data
+    depends_on:
+      - $DB_CONTAINER
+      - $WP_CONTAINER
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  default:
+    name: $DOCKER_DEV_NETWORK
+    external: true
+EOF
+        ;;
+
+    "docker-apache-prod")
+        cat <<EOF >docker-compose-apache.prod.yaml
+services:
+  $WP_CONTAINER:
+    container_name: $WP_CONTAINER
+    image: $APACHE_WP_IMAGE
+    restart: unless-stopped
+    volumes:
+      - $DATA_DIR/site:/var/www/html
+      - $CONFIG_DIR/php:/usr/local/etc/php/conf.d
+    environment:
+      WORDPRESS_DB_HOST: \${DB_CONTAINER}:3306
+      WORDPRESS_DB_NAME: \${MYSQL_DATABASE}
+      WORDPRESS_DB_USER: \${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: \${MYSQL_PASSWORD}
+      WORDPRESS_DEBUG: false
+      WORDPRESS_TABLE_PREFIX: $WP_TABLE_PREFIX
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+        define('WP_ENVIRONMENT_TYPE', 'production');
+      WORDPRESS_REDIS_HOST: $REDIS_CONTAINER
+      DOMAIN_CURRENT_SITE: $DOMAIN
+    depends_on:
+      - $DB_CONTAINER
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.$PROJECT_NAME.loadbalancer.server.port=80"
+      - "traefik.http.routers.$PROJECT_NAME.rule=Host(\${DOMAIN}) || Host(www.\${DOMAIN})"
+      - "traefik.http.routers.$PROJECT_NAME.entrypoints=websecure"
+      - "traefik.http.routers.$PROJECT_NAME.tls.certresolver=production"
+      - "traefik.http.routers.$PROJECT_NAME.tls=true"
+
+  $DB_CONTAINER:
+    container_name: $DB_CONTAINER
+    image: $DB_IMAGE
+    restart: unless-stopped
+    volumes:
+      - $DATA_DIR/mysql:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: \${MYSQL_DATABASE}
+      MYSQL_USER: \${MYSQL_USER}
+      MYSQL_PASSWORD: \${MYSQL_PASSWORD}
+
+  $WP_CLI_CONTAINER:
+    container_name: $WP_CLI_CONTAINER
+    image: wordpress:cli
+    restart: unless-stopped
+    user: "\${USER_ID}:\${GROUP_ID}"
+    volumes:
+      - $DATA_DIR/site:/var/www/html
+    environment:
+      WORDPRESS_DB_HOST: $DB_CONTAINER:3306
+      WORDPRESS_DB_NAME: \${MYSQL_DATABASE}
+      WORDPRESS_DB_USER: \${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: \${MYSQL_PASSWORD}
+    depends_on:
+      - $DB_CONTAINER
+    command: tail -f /dev/null
+
+  $REDIS_CONTAINER:
+    container_name: $REDIS_CONTAINER
+    image: $REDIS_IMAGE
+    restart: unless-stopped
+    volumes:
+      - $DATA_DIR/redis:/data
+    depends_on:
+      - $DB_CONTAINER
+      - $WP_CONTAINER
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  default:
+    name: $DOCKER_PROD_NETWORK
+    external: true
+EOF
+        ;;
+
     esac
 
     log_success "$config_type configurations generated!"
@@ -1376,67 +1892,112 @@ db_operation() {
 
 # Remote database operations submenu
 remote_db_sync_menu() {
-    local options=(
-        "1" "Pull database from remote server"
-        "2" "Push database to remote server"
-        "3" "Search and replace domain in database"
-        "4" "Export database"
-        "5" "Import database"
-        "6" "Back to main menu"
-    )
-
     while true; do
-        local choice
-        choice=$(whiptail --title "Remote Database Operations" \
-            --nocancel \
-            --menu "\nRemote and Local Database Details:\n----------------------------------------------\n| Remote Details          | Local Details    |\n----------------------------------------------\n| SSH Host: $REMOTE_SSH_HOST | DB Container: $DB_CONTAINER |\n| DB Container: $REMOTE_DB_CONTAINER | DB User: $MYSQL_USER |\n| DB User: $REMOTE_DB_USER | DB Name: $MYSQL_DATABASE |\n| DB Name: $REMOTE_DB_NAME | Domain: $LOCAL_DOMAIN |\n| Domain: $REMOTE_DOMAIN   |                  |\n----------------------------------------------\n\nSelect an operation:" 20 70 6 \
-            "${options[@]}" \
-            3>&1 1>&2 2>&3)
+        # Display current configuration info with enhanced Gum styling
+        echo
+        gum style --border double --border-foreground "#04B575" --padding "1 2" --margin "0 1" --align center "Remote Database Sync Configuration"
+        echo
 
-        if [[ -z "$choice" || "$choice" == "6" ]]; then
+        # Create side-by-side comparison using Gum join
+        local remote_config=$(gum style \
+            --border rounded \
+            --border-foreground "#FF6B6B" \
+            --padding "1 2" \
+            --margin "0 1" \
+            --width 35 \
+            --bold \
+            "🌐 Remote Server Details" \
+            "" \
+            "$(gum style --foreground "#FFD93D" "SSH Host:") $REMOTE_SSH_HOST" \
+            "$(gum style --foreground "#FFD93D" "DB Container:") $REMOTE_DB_CONTAINER" \
+            "$(gum style --foreground "#FFD93D" "DB User:") $REMOTE_DB_USER" \
+            "$(gum style --foreground "#FFD93D" "DB Name:") $REMOTE_DB_NAME")
+
+        local local_config=$(gum style \
+            --border rounded \
+            --border-foreground "#04B575" \
+            --padding "1 2" \
+            --margin "0 1" \
+            --width 35 \
+            --bold \
+            "🏠 Local Server Details" \
+            "" \
+            "$(gum style --foreground "#6BCF7F" "DB Container:") $DB_CONTAINER" \
+            "$(gum style --foreground "#6BCF7F" "DB User:") $MYSQL_USER" \
+            "$(gum style --foreground "#6BCF7F" "DB Name:") $MYSQL_DATABASE" \
+            "")
+
+        # Join the two configuration blocks side by side
+        gum join --horizontal --align top "$remote_config" "$local_config"
+        echo
+
+        local options=(
+            "⬇️  Pull database from remote server"
+            "⬆️  Push database to remote server"
+            "🔍  Search and replace domain in database"
+            "💾  Export database"
+            "📥  Import database"
+            "🔙  Back to main menu"
+        )
+
+        local choice
+        choice=$(gum_menu "Remote Database Operations" "${options[@]}")
+
+        # Exit if no selection or user pressed Esc
+        if [[ -z "$choice" || "$choice" == *"Back to main menu"* ]]; then
             return 0
         fi
 
-        case $choice in
-        "1")
-            if whiptail --title "Warning" --yesno "This action will overwrite your local database entirely with the remote database!\n\nContinue?" 10 70; then
+        case "$choice" in
+        *"Pull database from remote server"*)
+            log_warning "WARNING: This action will overwrite your local database entirely with the remote database!"
+            read -p "Continue? (y/N): " confirm
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
                 db_operation "pull"
             fi
             ;;
-        "2")
-            if whiptail --title "Warning" --yesno "This action will overwrite your remote database entirely with the local database!\n\nContinue?" 10 70; then
+        *"Push database to remote server"*)
+            log_warning "WARNING: This action will overwrite your remote database entirely with the local database!"
+            read -p "Continue? (y/N): " confirm
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
                 db_operation "push"
             fi
             ;;
-        "3")
+        *"Search and replace domain in database"*)
             local search_str replace_str
-            search_str=$(whiptail --title "Search String" --nocancel --inputbox "Enter search string:" 10 60 "" 3>&1 1>&2 2>&3)
-            replace_str=$(whiptail --title "Replace String" --nocancel --inputbox "Enter replace string:" 10 60 "" 3>&1 1>&2 2>&3)
+            search_str=$(gum_input "Enter search string" "")
+            if [[ -z "$search_str" ]]; then continue; fi
+
+            replace_str=$(gum_input "Enter replace string" "")
+            if [[ -z "$replace_str" ]]; then continue; fi
 
             if [[ -z "$search_str" || -z "$replace_str" ]]; then
-                whiptail --title "Error" --msgbox "Both search and replace strings are required!" 10 60
+                log_error "Both search and replace strings are required!"
             else
                 docker exec $WP_CLI_CONTAINER wp search-replace "$search_str" "$replace_str" --all-tables
-                whiptail --title "Success" --msgbox "Search and replace complete!" 10 60
+                log_success "Search and replace complete!"
             fi
             ;;
-        "4")
+        *"Export database"*)
             local filename
-            filename=$(whiptail --title "Output Filename" --nocancel --inputbox "Enter output filename:" 10 60 "${PROJECT_NAME}_db_backup.sql" 3>&1 1>&2 2>&3)
+            filename=$(gum_input "Enter output filename" "${PROJECT_NAME}_db_backup.sql")
+            if [[ -z "$filename" ]]; then continue; fi
+
             docker exec $DB_CONTAINER mysqldump -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE >"$filename"
-            whiptail --title "Success" --msgbox "Database exported to $filename!" 10 60
+            log_success "Database exported to $filename!"
             ;;
-        "5")
+        *"Import database"*)
             local filename
-            filename=$(whiptail --title "Input Filename" --nocancel --inputbox "Enter input filename:" 10 60 "" 3>&1 1>&2 2>&3)
+            filename=$(gum_input "Enter input filename" "")
+            if [[ -z "$filename" ]]; then continue; fi
 
             if [[ -z "$filename" ]]; then
-                whiptail --title "Error" --msgbox "Filename is required!" 10 60
+                log_error "Filename is required!"
             elif [[ ! -f "$filename" ]]; then
-                whiptail --title "Error" --msgbox "File not found: $filename" 10 60
+                log_error "File not found: $filename"
             else
                 docker exec -i $DB_CONTAINER mysql -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE <"$filename"
-                whiptail --title "Success" --msgbox "Database imported from $filename!" 10 60
+                log_success "Database imported from $filename!"
             fi
             ;;
         *)
@@ -1446,163 +2007,215 @@ remote_db_sync_menu() {
     done
 }
 
-# Simplified menu handling with checkbox-style interface using whiptail
+# Main menu using gum interface
 show_menu() {
     local options=(
-        "1" "Check requirements" "OFF"
-        "2" "Configure project settings" "OFF"
-        "3" "Configure advanced settings" "OFF"
-        "4" "Create required directories" "OFF"
-        "5" "Manage proxy container" "OFF"
-        "6" "Generate certificates using mkcert" "OFF"
-        "7" "Manage hosts file" "OFF"
-        "8" "Generate .env file" "OFF"
-        "9" "Generate nginx.conf file" "OFF"
-        "10" "Generate PHP configs" "OFF"
-        "11" "Generate development docker-compose.yml file" "OFF"
-        "12" "Generate production docker-compose.yml file" "OFF"
-        "13" "Docker operations menu" "OFF"
-        "14" "WordPress CLI menu" "OFF"
-        "15" "Remote sync operations menu" "OFF"
-        "16" "Remote database sync menu" "OFF"
-        "17" "Generate WP-CLI aliases file" "OFF"
-        "18" "List all docker networks" "OFF"
-        "19" "Create docker network" "OFF"
-        "20" "Manage Docker images menu" "OFF"
-        "21" "Exit" "OFF"
+        "✅  Check requirements"
+        "⚙️  Configure project settings"
+        "🔧  Configure advanced settings"
+        "🌐  Configure remote server settings"
+        "📁  Create required directories"
+        "🔗  Manage proxy container"
+        "🔐  Generate certificates using mkcert"
+        "🏠  Manage hosts file"
+        "📄  Generate .env file"
+        "🌐  Generate nginx.conf file"
+        "🐘  Generate PHP configs"
+        "🛠️  Generate development docker-compose.dev.yml file"
+        "🚀  Generate production docker-compose.prod.yml file"
+        "🐧  Generate Apache development docker-compose-apache.dev.yml file"
+        "⚡  Generate Apache production docker-compose-apache.prod.yml file"
+        "🐳  Docker operations menu"
+        "🔧  WordPress CLI menu"
+        "🔄  Remote sync operations menu"
+        "💾  Remote database sync menu"
+        "📋  Generate WP-CLI aliases file"
+        "📊  List all docker networks"
+        "🌐  Create docker network"
+        "🎯  Manage Docker images menu"
+        "🚪  Exit"
     )
 
-    local choices
-    choices=$(whiptail --title "WordPress Docker Environment" \
-        --nocancel \
-        --checklist "Select one or more options:" 20 70 15 \
-        "${options[@]}" 3>&1 1>&2 2>&3)
+    local choice
+    choice=$(gum_menu "WordPress Docker Environment - Main Menu" "${options[@]}")
 
     clear
 
-    if [[ -z "$choices" ]]; then
-        log_warning "No selection made."
-        return 1
+    if [[ $? -ne 0 ]]; then
+        log_info "Exiting..."
+        exit 0
     fi
 
-    # Execute selected options
-    for choice in $(echo $choices | tr -d '"'); do
-        case $choice in
-        "1") check_requirements ;;
-        "2") configure_project ;;
-        "3") configure_advanced ;;
-        "4") create_directories ;;
-        "5") manage_proxy_container ;;
-        "6") generate_certs ;;
-        "7") manage_hosts_file ;;
-        "8") generate_configs "env" ;;
-        "9") generate_configs "nginx" ;;
-        "10") generate_configs "php" ;;
-        "11") generate_configs "docker-dev" ;;
-        "12") generate_configs "docker-prod" ;;
-        "13") configure_docker_menu ;;
-        "14") configure_wpcli_menu ;;
-        "15") remote_sync_menu ;;
-        "16") remote_db_sync_menu ;;
-        "17")
-            mkdir -p ~/.wp-cli
-            cat <<EOF >~/.wp-cli/config.yml
+    # Execute selected option
+    case "$choice" in
+    *"Check requirements"*)
+        check_requirements
+        ;;
+    *"Configure project settings"*)
+        configure_project
+        ;;
+    *"Configure advanced settings"*)
+        configure_advanced
+        ;;
+    *"Configure remote server settings"*)
+        configure_remote_server
+        ;;
+    *"Create required directories"*)
+        create_directories
+        ;;
+    *"Manage proxy container"*)
+        manage_proxy_container
+        ;;
+    *"Generate certificates using mkcert"*)
+        generate_certs
+        ;;
+    *"Manage hosts file"*)
+        manage_hosts_file
+        ;;
+    *"Generate .env file"*)
+        generate_configs "env"
+        ;;
+    *"Generate nginx.conf file"*)
+        generate_configs "nginx"
+        ;;
+    *"Generate PHP configs"*)
+        generate_configs "php"
+        ;;
+    *"Generate development docker-compose.dev.yml file"*)
+        generate_configs "docker-dev"
+        ;;
+    *"Generate production docker-compose.prod.yml file"*)
+        generate_configs "docker-prod"
+        ;;
+    *"Generate Apache development docker-compose-apache.dev.yml file"*)
+        generate_configs "docker-apache-dev"
+        ;;
+    *"Generate Apache production docker-compose-apache.prod.yml file"*)
+        generate_configs "docker-apache-prod"
+        ;;
+    *"Docker operations menu"*)
+        configure_docker_menu
+        ;;
+    *"WordPress CLI menu"*)
+        configure_wpcli_menu
+        ;;
+    *"Remote sync operations menu"*)
+        remote_sync_menu
+        ;;
+    *"Remote database sync menu"*)
+        remote_db_sync_menu
+        ;;
+    *"Generate WP-CLI aliases file"*)
+        mkdir -p ~/.wp-cli
+        cat <<EOF >~/.wp-cli/config.yml
 @$PROJECT_NAME:
   ssh: ''
   path: /var/www/html
 EOF
-            log_success "WP-CLI aliases file generated!"
-            ;;
-        "18")
-            clear
-            log_info "Docker Networks:"
-            docker network ls
-            read -p "Press Enter to continue..." enter_key
-            ;;
-        "19") createDockerNetwork ;;
-        "20") manage_docker_images_menu ;;
-        "21")
-            log_info "Exiting..."
-            exit 0
-            ;;
-        *)
-            log_warning "Invalid option: $choice"
-            ;;
-        esac
-    done
+        log_success "WP-CLI aliases file generated!"
+        ;;
+    *"List all docker networks"*)
+        clear
+        log_info "Docker Networks:"
+        docker network ls
+        read -p "Press Enter to continue..." enter_key
+        ;;
+    *"Create docker network"*)
+        createDockerNetwork
+        ;;
+    *"Manage Docker images menu"*)
+        manage_docker_images_menu
+        ;;
+    *"Exit"*)
+        log_info "Exiting..."
+        exit 0
+        ;;
+    *)
+        log_warning "Invalid option: $choice"
+        ;;
+    esac
 
     return 0
 }
 
 # Remote sync submenu
 remote_sync_menu() {
-    local options=(
-        "1" "Sync plugins from remote server"
-        "2" "Sync themes from remote server"
-        "3" "Sync uploads from remote server"
-        "4" "Sync all content from remote server"
-        "5" "Custom sync operation"
-        "6" "Back to main menu"
-    )
-
     while true; do
-        local choice
-        choice=$(whiptail --title "Remote Sync Operations" \
-            --nocancel \
-            --menu "Select an operation:" 16 60 6 \
-            "${options[@]}" \
-            3>&1 1>&2 2>&3)
+        local options=(
+            "🔌  Sync plugins from remote server"
+            "🎨  Sync themes from remote server"
+            "📂  Sync uploads from remote server"
+            "🔄  Sync all content from remote server"
+            "⚙️  Custom sync operation"
+            "🔙  Back to main menu"
+        )
 
-        # Exit the loop if user pressed Escape or selected nothing
-        if [[ -z "$choice" || "$choice" == "6" ]]; then
+        local choice
+        choice=$(gum_menu "Remote Sync Operations" "${options[@]}")
+
+        # Exit if no selection or user pressed Esc
+        if [[ -z "$choice" || "$choice" == *"Back to main menu"* ]]; then
             return 0
         fi
 
-        case $choice in
-        "1")
+        case "$choice" in
+        *"Sync plugins from remote server"*)
             local remote_host remote_path
-            remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
-            remote_path=$(whiptail --title "Remote Path" --nocancel --inputbox "Enter remote path:" 10 60 "$REMOTE_PROJECT_PATH" 3>&1 1>&2 2>&3)
+            remote_host=$(gum_input "Enter remote host" "$REMOTE_SSH_HOST")
+            if [[ -z "$remote_host" ]]; then continue; fi
+
+            remote_path=$(gum_input "Enter remote path" "$REMOTE_PROJECT_PATH")
+            if [[ -z "$remote_path" ]]; then continue; fi
 
             handleRemoteSync "plugins" "$remote_host" "$remote_path"
-            whiptail --title "Success" --msgbox "Plugins sync complete!" 10 60
+            log_success "Plugins sync complete!"
             ;;
-        "2")
+        *"Sync themes from remote server"*)
             local remote_host remote_path
-            remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
-            remote_path=$(whiptail --title "Remote Path" --nocancel --inputbox "Enter remote path:" 10 60 "$REMOTE_PROJECT_PATH" 3>&1 1>&2 2>&3)
+            remote_host=$(gum_input "Enter remote host" "$REMOTE_SSH_HOST")
+            if [[ -z "$remote_host" ]]; then continue; fi
+
+            remote_path=$(gum_input "Enter remote path" "$REMOTE_PROJECT_PATH")
+            if [[ -z "$remote_path" ]]; then continue; fi
 
             handleRemoteSync "themes" "$remote_host" "$remote_path"
-            whiptail --title "Success" --msgbox "Themes sync complete!" 10 60
+            log_success "Themes sync complete!"
             ;;
-        "3")
+        *"Sync uploads from remote server"*)
             local remote_host remote_path
-            remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
-            remote_path=$(whiptail --title "Remote Path" --nocancel --inputbox "Enter remote path:" 10 60 "$REMOTE_PROJECT_PATH" 3>&1 1>&2 2>&3)
+            remote_host=$(gum_input "Enter remote host" "$REMOTE_SSH_HOST")
+            if [[ -z "$remote_host" ]]; then continue; fi
+
+            remote_path=$(gum_input "Enter remote path" "$REMOTE_PROJECT_PATH")
+            if [[ -z "$remote_path" ]]; then continue; fi
 
             handleRemoteSync "uploads" "$remote_host" "$remote_path"
-            whiptail --title "Success" --msgbox "Uploads sync complete!" 10 60
+            log_success "Uploads sync complete!"
             ;;
-        "4")
+        *"Sync all content from remote server"*)
             local remote_host remote_path
-            remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
-            remote_path=$(whiptail --title "Remote Path" --nocancel --inputbox "Enter remote path:" 10 60 "$REMOTE_PROJECT_PATH" 3>&1 1>&2 2>&3)
+            remote_host=$(gum_input "Enter remote host" "$REMOTE_SSH_HOST")
+            if [[ -z "$remote_host" ]]; then continue; fi
+
+            remote_path=$(gum_input "Enter remote path" "$REMOTE_PROJECT_PATH")
+            if [[ -z "$remote_path" ]]; then continue; fi
 
             handleRemoteSync "all" "$remote_host" "$remote_path"
-            whiptail --title "Success" --msgbox "All content sync complete!" 10 60
+            log_success "All content sync complete!"
             ;;
-        "5")
+        *"Custom sync operation"*)
             local remote_host remote_custom_path local_custom_path
-            remote_host=$(whiptail --title "Remote Host" --nocancel --inputbox "Enter remote host:" 10 60 "$REMOTE_SSH_HOST" 3>&1 1>&2 2>&3)
-            remote_custom_path=$(whiptail --title "Remote Custom Path" --nocancel --inputbox "Enter remote custom path:" 10 60 "" 3>&1 1>&2 2>&3)
-            local_custom_path=$(whiptail --title "Local Custom Path" --nocancel --inputbox "Enter local custom path:" 10 60 "" 3>&1 1>&2 2>&3)
+            remote_host=$(gum_input "Enter remote host" "$REMOTE_SSH_HOST")
+            if [[ -z "$remote_host" ]]; then continue; fi
 
-            if [[ -n "$remote_custom_path" && -n "$local_custom_path" ]]; then
-                handleRemoteSync "custom" "$remote_host" "$remote_custom_path" "$local_custom_path"
-                whiptail --title "Success" --msgbox "Custom sync complete!" 10 60
-            else
-                whiptail --title "Error" --msgbox "Both remote and local paths are required!" 10 60
-            fi
+            remote_custom_path=$(gum_input "Enter remote custom path" "")
+            if [[ -z "$remote_custom_path" ]]; then continue; fi
+
+            local_custom_path=$(gum_input "Enter local custom path" "")
+            if [[ -z "$local_custom_path" ]]; then continue; fi
+
+            handleRemoteSync "custom" "$remote_host" "$remote_custom_path" "$local_custom_path"
+            log_success "Custom sync complete!"
             ;;
         *)
             log_warning "Invalid choice: $choice"
@@ -1821,11 +2434,11 @@ createDockerNetwork() {
 
 # Main function
 main() {
-    # Check if running as root
-    if [[ $EUID -eq 0 ]]; then
-        log_error "This script should not be run as root!"
-        exit 1
-    fi
+    # Show enhanced header
+    show_header
+
+    # Check system requirements
+    check_requirements
 
     # Check if this is the first run
     if [[ ! -f "$CONFIG_FILE" ]]; then
