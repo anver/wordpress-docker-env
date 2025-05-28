@@ -8,8 +8,9 @@ if command -v composer &>/dev/null; then
   exit 0
 fi
 
-# Install using apk package manager
-apk add --no-cache composer
+# Install composer using curl
+curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
 # Check if installation was successful
 if command -v composer &>/dev/null; then
   echo "Composer installed successfully"
