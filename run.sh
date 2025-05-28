@@ -1037,17 +1037,17 @@ manage_docker_images_menu() {
         case "$choice" in
         *"Build development image"*)
             log_info "Building development image: $WP_UNIT_TESTING_IMAGE..."
-            docker build -f docker/wp/Dockerfile.dev -t $WP_UNIT_TESTING_IMAGE .
+            docker build -f .docker/wp/Dockerfile.dev -t $WP_UNIT_TESTING_IMAGE .
             log_success "Development image built successfully!"
             ;;
         *"Build production image"*)
             log_info "Building production image: $WP_IMAGE..."
-            docker build -f docker/wp/Dockerfile.prod -t $WP_IMAGE .
+            docker build -f .docker/wp/Dockerfile.prod -t $WP_IMAGE .
             log_success "Production image built successfully!"
             ;;
         *"Build Vite image"*)
             log_info "Building Vite image: $VITE_IMAGE..."
-            docker build -f docker/vite/Dockerfile.prod -t $VITE_IMAGE .
+            docker build -f .docker/vite/Dockerfile.prod -t $VITE_IMAGE .
             log_success "Vite image built and tagged as $VITE_IMAGE!"
             ;;
         *"Edit image versions"*)
