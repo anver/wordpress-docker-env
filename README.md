@@ -144,8 +144,10 @@ By following these steps, you can efficiently set up and manage your WordPress D
 │   ├── mysql/              # Database files
 │   ├── redis/              # Redis data
 │   └── site/               # WordPress files
-├── docker-compose.yaml     # Development environment
-├── docker-compose.prod.yaml # Production environment
+├── docker-compose.dev.yaml     # Development environment
+├── docker-compose.prod.yaml    # Production environment
+├── docker-compose-apache.dev.yaml   # Apache development environment
+├── docker-compose-apache.prod.yaml  # Apache production environment
 ├── wordpress-docker.conf   # Configuration variables
 ├── run.sh                  # Main script for environment management
 └── README.md               # Documentation
