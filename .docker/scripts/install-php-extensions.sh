@@ -16,6 +16,7 @@ install-php-extensions \
   mbstring \
   bcmath \
   sockets \
+  imagick \
   pgsql \
   pdo_pgsql \
   opcache \

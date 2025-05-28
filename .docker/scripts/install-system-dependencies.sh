@@ -30,8 +30,6 @@ apk add --no-cache \
     libxslt \
     libzip \
     icu-libs \
-    imagemagick \
-    imagemagick-libs \
     shadow
 
 # Clean up
