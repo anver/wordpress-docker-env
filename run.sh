@@ -1603,7 +1603,7 @@ EOF
 # This can be extended to add custom host entries based on environment variables
 
 # Create FastCGI cache directory and set permissions
-mkdir -p /var/cache/nginx/fastcgi_temp
+mkdir -p /var/cache/nginx/fastcgi
 chown -R nginx:nginx /var/cache/nginx
 chmod -R 755 /var/cache/nginx
 
@@ -1617,7 +1617,7 @@ if ! grep -q "fastcgi_cache_path" "$NGINX_CONF"; then
     # Add cache configuration to http block
     sed -i '/http {/a\
     # FastCGI Cache\
-    fastcgi_cache_path /var/cache/nginx/fastcgi_temp levels=1:2 keys_zone=WORDPRESS:100m inactive=60m;\
+    fastcgi_cache_path /var/cache/nginx/fastcgi levels=1:2 keys_zone=WORDPRESS:100m inactive=60m;\
     fastcgi_cache_key "$scheme$request_method$host$request_uri";\
     fastcgi_cache_use_stale error timeout invalid_header http_500;\
     fastcgi_ignore_headers Cache-Control Expires Set-Cookie;' "$NGINX_CONF"
