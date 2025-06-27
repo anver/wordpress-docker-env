@@ -1376,7 +1376,7 @@ EOF
         mkdir -p "${CONFIG_DIR}/nginx" "${CONFIG_DIR}/nginx/includes"
 
         # Main nginx config
-        cat <<EOF >$CONFIG_DIR/nginx/nginx.conf
+        cat <<EOF >$CONFIG_DIR/nginx/nginx-main.conf
 server {
     listen 80;
     listen [::]:80;
@@ -1389,7 +1389,7 @@ server {
     index index.php;
     
     server_tokens off;
-    include /etc/nginx/my_include_files/*.conf;
+    include /etc/nginx/conf.d/includes/*.conf;
     
     client_max_body_size 100M;
     
@@ -1432,16 +1432,47 @@ server {
         try_files \$uri \$uri/ /index.php?\$args;
     }
     
-    # Static files caching
-    location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
+    # Static files caching - Enhanced
+    location ~* \.(jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|webp|avif|mp4|webm|pdf|zip)$ {
+        expires 1y;
+        access_log off;
+        add_header Cache-Control "public, immutable, max-age=31536000";
+        add_header Vary "Accept-Encoding";
+        try_files \$uri =404;
+    }
+
+    # Separate shorter cache for CSS/JS that might change more often
+    location ~* \.(css|js)$ {
         expires 30d;
         access_log off;
         add_header Cache-Control "public, max-age=2592000";
-        try_files \$uri \$uri/ /index.php?\$args;
+        add_header Vary "Accept-Encoding";
+        try_files \$uri =404;
     }
     
-    # Pass PHP scripts to FastCGI server
+    # WordPress admin and login pages - no cache
+    location ~* ^/(wp-admin|wp-login\.php) {
+        try_files \$uri \$uri/ /index.php?\$args;
+        
+        location ~ \.php$ {
+            fastcgi_split_path_info ^(.+\.php)(/.+)$;
+            fastcgi_pass ${WP_CONTAINER}:9000;
+            fastcgi_index index.php;
+            include fastcgi_params;
+            fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+            fastcgi_param SCRIPT_NAME \$fastcgi_script_name;
+            fastcgi_param PATH_INFO \$fastcgi_path_info;
+            fastcgi_read_timeout 300;
+            
+            # No caching for admin
+            fastcgi_cache_bypass 1;
+            fastcgi_no_cache 1;
+        }
+    }
+    
+    # Pass PHP scripts to FastCGI server with caching
     location ~ \.php$ {
+        try_files \$uri =404;
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
         fastcgi_pass ${WP_CONTAINER}:9000;
         fastcgi_index index.php;
@@ -1450,6 +1481,73 @@ server {
         fastcgi_param SCRIPT_NAME \$fastcgi_script_name;
         fastcgi_param PATH_INFO \$fastcgi_path_info;
         fastcgi_read_timeout 300;
+        
+        # FastCGI Cache Settings
+        fastcgi_cache WORDPRESS;
+        fastcgi_cache_valid 200 301 302 30m;
+        fastcgi_cache_valid 404 1m;
+        fastcgi_cache_min_uses 1;
+        fastcgi_cache_lock on;
+        
+        # Cache bypass conditions
+        set \$skip_cache 0;
+        
+        # POST requests and URLs with query string should always go to PHP
+        if (\$request_method = POST) {
+            set \$skip_cache 1;
+        }
+        if (\$query_string != "") {
+            set \$skip_cache 1;
+        }
+        
+        # Don't cache URLs containing the following segments
+        if (\$request_uri ~* "/wp-admin/|/xmlrpc.php|wp-.*.php|/feed/|index.php|sitemap(_index)?.xml") {
+            set \$skip_cache 1;
+        }
+        
+        # Don't use the cache for logged-in users or recent commenters
+        if (\$http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_no_cache|wordpress_logged_in") {
+            set \$skip_cache 1;
+        }
+        
+        fastcgi_cache_bypass \$skip_cache;
+        fastcgi_no_cache \$skip_cache;
+        
+        # Buffer settings for better performance
+        fastcgi_buffers 16 16k;
+        fastcgi_buffer_size 32k;
+    }
+    
+    # API endpoints - shorter cache
+    location ~ ^/wp-json/ {
+        try_files \$uri \$uri/ /index.php?\$args;
+        
+        location ~ \.php$ {
+            fastcgi_split_path_info ^(.+\.php)(/.+)$;
+            fastcgi_pass ${WP_CONTAINER}:9000;
+            fastcgi_index index.php;
+            include fastcgi_params;
+            fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+            fastcgi_param SCRIPT_NAME \$fastcgi_script_name;
+            fastcgi_param PATH_INFO \$fastcgi_path_info;
+            fastcgi_read_timeout 300;
+            
+            # Short cache for API endpoints
+            fastcgi_cache WORDPRESS;
+            fastcgi_cache_valid 200 5m;
+            
+            # Cache bypass conditions
+            set \$skip_cache 0;
+            if (\$request_method = POST) {
+                set \$skip_cache 1;
+            }
+            if (\$query_string != "") {
+                set \$skip_cache 1;
+            }
+            
+            fastcgi_cache_bypass \$skip_cache;
+            fastcgi_no_cache \$skip_cache;
+        }
     }
     
     # Deny access to sensitive files
@@ -1468,6 +1566,9 @@ add_header X-Content-Type-Options "nosniff" always;
 add_header Referrer-Policy "no-referrer-when-downgrade" always;
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
+# Performance headers
+add_header X-FastCGI-Cache \$upstream_cache_status;
+
 # Prevent access to sensitive files
 location ~ /\.(?!well-known) {
     deny all;
@@ -1477,7 +1578,255 @@ location ~ /\.(?!well-known) {
 location ~* /(?:uploads|files)/.*\.php$ {
     deny all;
 }
+
+# WordPress specific optimizations
+location = /favicon.ico {
+    log_not_found off;
+    access_log off;
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+}
+
+location = /robots.txt {
+    allow all;
+    log_not_found off;
+    access_log off;
+    expires 1h;
+}
 EOF
+
+        # Generate entrypoint script for Nginx container
+        cat <<'EOF' >$CONFIG_DIR/nginx/entrypoint.sh
+#!/bin/sh
+
+# Update /etc/hosts with any custom host mappings if needed
+# This can be extended to add custom host entries based on environment variables
+
+# Create FastCGI cache directory and set permissions
+mkdir -p /var/cache/nginx/fastcgi_temp
+chown -R nginx:nginx /var/cache/nginx
+chmod -R 755 /var/cache/nginx
+
+# Create log directory if it doesn't exist
+mkdir -p /var/log/nginx
+chown -R nginx:nginx /var/log/nginx
+
+# Add FastCGI cache zone to nginx.conf if not already present
+NGINX_CONF="/etc/nginx/nginx.conf"
+if ! grep -q "fastcgi_cache_path" "$NGINX_CONF"; then
+    # Add cache configuration to http block
+    sed -i '/http {/a\
+    # FastCGI Cache\
+    fastcgi_cache_path /var/cache/nginx/fastcgi_temp levels=1:2 keys_zone=WORDPRESS:100m inactive=60m;\
+    fastcgi_cache_key "$scheme$request_method$host$request_uri";\
+    fastcgi_cache_use_stale error timeout invalid_header http_500;\
+    fastcgi_ignore_headers Cache-Control Expires Set-Cookie;' "$NGINX_CONF"
+fi
+
+# Test nginx configuration
+nginx -t
+
+# If config test passes, start nginx
+if [ $? -eq 0 ]; then
+    echo "Nginx configuration is valid. Starting nginx..."
+    exec nginx -g "daemon off;"
+else
+    echo "Nginx configuration test failed!"
+    exit 1
+fi
+EOF
+
+        # Make the entrypoint script executable
+        chmod +x $CONFIG_DIR/nginx/entrypoint.sh
+
+        # Generate update-hosts script for Nginx container
+        cat <<'EOF' >$CONFIG_DIR/nginx/update-hosts.sh
+#!/bin/sh
+
+# Script to add paradigm_nginx container IP to /etc/hosts
+# This script should be run inside the nginx container (Alpine compatible)
+
+set -e
+
+# Function to log messages
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# Function to get container IP by name
+get_container_ip() {
+    local container_name="$1"
+    local network_name="${2:-proxy}"
+    
+    # Try to get IP from Docker API via host
+    if command -v curl >/dev/null 2>&1; then
+        # Method 1: Using Docker socket (if available)
+        if [ -S /var/run/docker.sock ]; then
+            local container_id=$(curl -s --unix-socket /var/run/docker.sock \
+                "http://localhost/containers/json" | \
+                grep -o "\"Names\":\[\"/$container_name\"\].*\"Id\":\"[^\"]*\"" | \
+                grep -o "\"Id\":\"[^\"]*\"" | cut -d'"' -f4)
+            
+            if [ -n "$container_id" ]; then
+                local ip=$(curl -s --unix-socket /var/run/docker.sock \
+                    "http://localhost/containers/$container_id/json" | \
+                    grep -o "\"$network_name\":{[^}]*\"IPAddress\":\"[^\"]*\"" | \
+                    grep -o "\"IPAddress\":\"[^\"]*\"" | cut -d'"' -f4)
+                echo "$ip"
+                return 0
+            fi
+        fi
+    fi
+    
+    # Method 2: Using nslookup (works in Docker networks)
+    if command -v nslookup >/dev/null 2>&1; then
+        local ip=$(nslookup "$container_name" 2>/dev/null | grep -A1 "Name:" | grep "Address:" | awk '{print $2}' | head -1)
+        if [ -n "$ip" ] && [ "$ip" != "127.0.0.1" ]; then
+            echo "$ip"
+            return 0
+        fi
+    fi
+    
+    # Method 3: Using getent (if available)
+    if command -v getent >/dev/null 2>&1; then
+        local ip=$(getent hosts "$container_name" 2>/dev/null | awk '{print $1}' | head -1)
+        if [ -n "$ip" ] && [ "$ip" != "127.0.0.1" ]; then
+            echo "$ip"
+            return 0
+        fi
+    fi
+    
+    # Method 4: Try ping and extract IP
+    if command -v ping >/dev/null 2>&1; then
+        local ip=$(ping -c 1 -W 2 "$container_name" 2>/dev/null | grep "PING" | grep -o "([0-9.]*)" | tr -d "()")
+        if [ -n "$ip" ] && [ "$ip" != "127.0.0.1" ]; then
+            echo "$ip"
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
+# Function to update /etc/hosts
+update_hosts_file() {
+    local container_name="$1"
+    local domain_name="$2"
+    local network_name="${3:-proxy}"
+    
+    log "Attempting to resolve IP for container: $container_name"
+    
+    # Get the container IP
+    local container_ip=$(get_container_ip "$container_name" "$network_name")
+    
+    if [ -z "$container_ip" ]; then
+        log "ERROR: Could not resolve IP for container: $container_name"
+        return 1
+    fi
+    
+    log "Found IP for $container_name: $container_ip"
+    
+    # Backup original hosts file
+    if [ ! -f /etc/hosts.backup ]; then
+        cp /etc/hosts /etc/hosts.backup
+        log "Created backup of original /etc/hosts"
+    fi
+    
+    # Remove any existing entries for this domain
+    grep -v "$domain_name" /etc/hosts > /tmp/hosts.tmp || true
+    
+    # Add the new entry
+    echo "$container_ip $domain_name" >> /tmp/hosts.tmp
+    
+    # Replace the hosts file
+    mv /tmp/hosts.tmp /etc/hosts
+    
+    log "Updated /etc/hosts with: $container_ip $domain_name"
+    
+    # Verify the entry
+    if grep -q "$domain_name" /etc/hosts; then
+        log "SUCCESS: $domain_name entry added to /etc/hosts"
+        
+        # Test the resolution
+        if command -v ping >/dev/null 2>&1; then
+            log "Testing resolution..."
+            if ping -c 1 -W 2 "$domain_name" >/dev/null 2>&1; then
+                log "SUCCESS: $domain_name resolves correctly"
+            else
+                log "WARNING: $domain_name may not resolve correctly"
+            fi
+        fi
+        
+        return 0
+    else
+        log "ERROR: Failed to add entry to /etc/hosts"
+        return 1
+    fi
+}
+
+# Function to wait for container to be available
+wait_for_container() {
+    local container_name="$1"
+    local max_attempts="${2:-30}"
+    local attempt=1
+    
+    log "Waiting for container $container_name to be available..."
+    
+    while [ $attempt -le $max_attempts ]; do
+        if get_container_ip "$container_name" >/dev/null 2>&1; then
+            log "Container $container_name is available"
+            return 0
+        fi
+        
+        log "Attempt $attempt/$max_attempts: Container $container_name not yet available, waiting 2 seconds..."
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+    
+    log "ERROR: Container $container_name did not become available within $((max_attempts * 2)) seconds"
+    return 1
+}
+
+# Main execution
+main() {
+    local container_name="${1:-paradigm_nginx}"
+    local domain_name="${2:-paradigm.local}"
+    local network_name="${3:-proxy}"
+    local max_wait_attempts="${4:-30}"
+    
+    log "Starting hosts file update script"
+    log "Target container: $container_name"
+    log "Domain name: $domain_name"
+    log "Network: $network_name"
+    
+    # Wait for the container to be available
+    if ! wait_for_container "$container_name" "$max_wait_attempts"; then
+        exit 1
+    fi
+    
+    # Update the hosts file
+    if update_hosts_file "$container_name" "$domain_name" "$network_name"; then
+        log "Hosts file update completed successfully"
+        
+        # Display current /etc/hosts content for verification
+        log "Current /etc/hosts content:"
+        cat /etc/hosts | while read line; do
+            log "  $line"
+        done
+        
+        exit 0
+    else
+        log "Hosts file update failed"
+        exit 1
+    fi
+}
+
+# Run main function with all arguments
+main "$@"
+EOF
+
+        # Make the update-hosts script executable
+        chmod +x $CONFIG_DIR/nginx/update-hosts.sh
         ;;
 
     "docker-dev")
@@ -1521,7 +1870,7 @@ ${plugin_mappings}      - $DATA_DIR/site:/var/www/html
     restart: unless-stopped
     volumes:
 ${plugin_mappings}      - $CONFIG_DIR/nginx:/etc/nginx/conf.d
-      - $CONFIG_DIR/nginx/includes:/etc/nginx/my_include_files
+      - $CONFIG_DIR/nginx/includes:/etc/nginx/conf.d/includes
       - $DATA_DIR/site:/var/www/html
     environment:
       - VIRTUAL_HOST=$DOMAIN,www.$DOMAIN
@@ -1602,7 +1951,7 @@ services:
     restart: unless-stopped
     volumes:
       - $CONFIG_DIR/nginx:/etc/nginx/conf.d
-      - $CONFIG_DIR/nginx/includes:/etc/nginx/my_include_files
+      - $CONFIG_DIR/nginx/includes:/etc/nginx/conf.d/includes
       - $DATA_DIR/site:/var/www/html
     labels:
       - "traefik.enable=true"
