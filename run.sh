@@ -1871,6 +1871,7 @@ ${plugin_mappings}      - $DATA_DIR/site:/var/www/html
     volumes:
 ${plugin_mappings}      - $CONFIG_DIR/nginx:/etc/nginx/conf.d
       - $CONFIG_DIR/nginx/includes:/etc/nginx/conf.d/includes
+      - $CONFIG_DIR/nginx/entrypoint.sh:/docker-entrypoint.d/40-cache-setup.sh
       - $DATA_DIR/site:/var/www/html
     environment:
       - VIRTUAL_HOST=$DOMAIN,www.$DOMAIN
@@ -1952,6 +1953,7 @@ services:
     volumes:
       - $CONFIG_DIR/nginx:/etc/nginx/conf.d
       - $CONFIG_DIR/nginx/includes:/etc/nginx/conf.d/includes
+      - $CONFIG_DIR/nginx/entrypoint.sh:/docker-entrypoint.d/40-cache-setup.sh
       - $DATA_DIR/site:/var/www/html
     labels:
       - "traefik.enable=true"
