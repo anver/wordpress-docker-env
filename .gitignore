@@ -2,6 +2,6 @@ wordpress-docker.conf
 .env
 config
 data
-docker-compose.yaml
+docker-compose.yml
 wordpress-docker.conf
 .github

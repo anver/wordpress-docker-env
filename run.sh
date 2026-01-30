@@ -1834,7 +1834,7 @@ EOF
         local plugin_mappings=$(get_plugin_mappings)
         local vite_mappings=$(get_vite_plugin_mappings)
 
-        cat <<EOF >docker-compose.dev.yaml
+        cat <<EOF >docker-compose.dev.yml
 services:
   $WP_CONTAINER:
     container_name: $WP_CONTAINER
@@ -1922,7 +1922,7 @@ EOF
         ;;
 
     "docker-prod")
-        cat <<EOF >docker-compose.prod.yaml
+        cat <<EOF >docker-compose.prod.yml
 services:
   $WP_CONTAINER:
     container_name: $WP_CONTAINER
@@ -2024,7 +2024,7 @@ EOF
         local plugin_mappings=$(get_plugin_mappings)
         local vite_mappings=$(get_vite_plugin_mappings)
 
-        cat <<EOF >docker-compose-apache.dev.yaml
+        cat <<EOF >docker-compose-apache.dev.yml
 services:
   $WP_CONTAINER:
     container_name: $WP_CONTAINER
@@ -2122,7 +2122,7 @@ EOF
         ;;
 
     "docker-apache-prod")
-        cat <<EOF >docker-compose-apache.prod.yaml
+        cat <<EOF >docker-compose-apache.prod.yml
 services:
   $WP_CONTAINER:
     container_name: $WP_CONTAINER
