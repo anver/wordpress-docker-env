@@ -17,6 +17,7 @@ install-php-extensions \
   bcmath \
   sockets \
   imagick \
+  intl \
   pgsql \
   pdo_pgsql \
   opcache \
@@ -25,7 +26,6 @@ install-php-extensions \
   zip \
   uv \
   vips \
-  intl \
   gd \
   memcached \
   igbinary \

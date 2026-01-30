@@ -1874,9 +1874,13 @@ ${plugin_mappings}      - $CONFIG_DIR/nginx:/etc/nginx/conf.d
       - $CONFIG_DIR/nginx/entrypoint.sh:/docker-entrypoint.d/40-cache-setup.sh
       - $DATA_DIR/site:/var/www/html
     environment:
-      - VIRTUAL_HOST=$DOMAIN,www.$DOMAIN
-      - VIRTUAL_PORT=80
-      - VIRTUAL_PROTO=http
+      VIRTUAL_HOST_MULTIPORTS: |-
+        $DOMAIN:
+          "/":
+            port: 80
+        www.$DOMAIN:
+          "/":
+            port: 80
     depends_on:
       - $WP_CONTAINER
     healthcheck:
@@ -1908,9 +1912,13 @@ ${plugin_mappings}      - $CONFIG_DIR/nginx:/etc/nginx/conf.d
     volumes:
 ${vite_mappings}    working_dir: /app
     environment:
-      VIRTUAL_HOST: "www.$VITE_DEV_SERVER,$VITE_DEV_SERVER"
-      VIRTUAL_PORT: 3000
-      VIRTUAL_PROTO: http
+      VIRTUAL_HOST_MULTIPORTS: |-
+        $VITE_DEV_SERVER:
+          "/":
+            port: 3000
+        www.$VITE_DEV_SERVER:
+          "/":
+            port: 3000
       VITE_DEV_SERVER_ADDRESS: "https://$VITE_DEV_SERVER"
     command: tail -f /dev/null
 
@@ -2048,9 +2056,13 @@ ${plugin_mappings}      - $DATA_DIR/site:/var/www/html
       WORDPRESS_REDIS_HOST: $REDIS_CONTAINER
       DOMAIN_CURRENT_SITE: $DOMAIN
       VITE_DEV_SERVER_ADDRESS: "https://$VITE_DEV_SERVER"
-      VIRTUAL_HOST: $DOMAIN,www.$DOMAIN
-      VIRTUAL_PORT: 80
-      VIRTUAL_PROTO: http
+      VIRTUAL_HOST_MULTIPORTS: |-
+        $DOMAIN:
+          "/":
+            port: 80
+        www.$DOMAIN:
+          "/":
+            port: 80
     depends_on:
       - $DB_CONTAINER
     extra_hosts:
@@ -2093,9 +2105,13 @@ ${plugin_mappings}      - $DATA_DIR/site:/var/www/html
     volumes:
 ${vite_mappings}    working_dir: /app
     environment:
-      VIRTUAL_HOST: "www.$VITE_DEV_SERVER,$VITE_DEV_SERVER"
-      VIRTUAL_PORT: 3000
-      VIRTUAL_PROTO: http
+      VIRTUAL_HOST_MULTIPORTS: |-
+        $VITE_DEV_SERVER:
+          "/":
+            port: 3000
+        www.$VITE_DEV_SERVER:
+          "/":
+            port: 3000
       VITE_DEV_SERVER_ADDRESS: "https://$VITE_DEV_SERVER"
     command: tail -f /dev/null
 

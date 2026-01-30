@@ -10,6 +10,7 @@ apk add --no-cache \
     npm \
     wget \
     vim \
+    subversion \
     tmux \
     tzdata \
     git \
